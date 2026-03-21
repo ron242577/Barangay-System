@@ -657,7 +657,7 @@ $stmt->close();
     <form class="resform" method="GET" action="Report.php" id="filterForm">
 
         <div>
-
+      <label>Status:</label>
       <select class="custom3" name="status" onchange="document.getElementById('filterForm').submit()">
         <option value="">All</option>
         <option value="Pending" <?= $status_filter === 'Pending' ? 'selected' : '' ?>>Pending</option>

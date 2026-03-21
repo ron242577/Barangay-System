@@ -2,6 +2,9 @@
 session_start();
 include "db.php";
 
+$successMessage = $_SESSION["success_message"] ?? "";
+unset($_SESSION["success_message"]);
+
 if (!isset($_SESSION["user_id"])) {
     header("Location: login.php");
     exit;
@@ -10,6 +13,38 @@ if (!isset($_SESSION["user_id"])) {
 if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "SuperAdmin") {
     header("Location: login.php");
     exit;
+}
+
+/* =========================================
+   HELPER: LAST LOGIN TEXT
+========================================= */
+function formatLastLogin($datetime) {
+    if (empty($datetime)) {
+        return "Never";
+    }
+
+    $timestamp = strtotime($datetime);
+    if (!$timestamp) {
+        return "Never";
+    }
+
+    $formatted = date("m/d/Y h:i A", $timestamp);
+
+    $diff = time() - $timestamp;
+    if ($diff < 60) {
+        $ago = "just now";
+    } elseif ($diff < 3600) {
+        $minutes = floor($diff / 60);
+        $ago = $minutes . " minute" . ($minutes > 1 ? "s" : "") . " ago";
+    } elseif ($diff < 86400) {
+        $hours = floor($diff / 3600);
+        $ago = $hours . " hour" . ($hours > 1 ? "s" : "") . " ago";
+    } else {
+        $days = floor($diff / 86400);
+        $ago = $days . " day" . ($days > 1 ? "s" : "") . " ago";
+    }
+
+    return $formatted . "<br><small>(" . $ago . ")</small>";
 }
 
 /* =========================================
@@ -24,7 +59,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["account_id"], $_POST[
 
         $updateStmt = $conn->prepare("UPDATE accounts SET status = ? WHERE id = ?");
         $updateStmt->bind_param("si", $new_status, $account_id);
-        $updateStmt->execute();
+
+        if ($updateStmt->execute()) {
+            $_SESSION["success_message"] = ($action === "activate")
+                ? "Account activated successfully."
+                : "Account deactivated successfully.";
+        } else {
+            $_SESSION["success_message"] = "Failed to update account status.";
+        }
+
         $updateStmt->close();
     }
 
@@ -39,10 +82,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["change_role"], $_POST
     $account_id = (int) $_POST["account_id"];
     $new_role = trim($_POST["new_role"]);
 
-    if ($account_id !== (int) $_SESSION["user_id"] && in_array($new_role, ["Admin", "resident"])) {
+    if ($account_id !== (int) $_SESSION["user_id"] && in_array($new_role, ["Admin", "resident", "SuperAdmin"])) {
         $roleStmt = $conn->prepare("UPDATE accounts SET role = ? WHERE id = ?");
         $roleStmt->bind_param("si", $new_role, $account_id);
-        $roleStmt->execute();
+
+        if ($roleStmt->execute()) {
+            $_SESSION["success_message"] = "Role changed successfully.";
+        } else {
+            $_SESSION["success_message"] = "Failed to change role.";
+        }
+
         $roleStmt->close();
     }
 
@@ -157,7 +206,7 @@ while ($row = $result->fetch_assoc()) {
             background: #f5f5f5;
         }
 
-        .btn-activate, .btn-deactivate, .btn-view, .btn-role {
+        .btn-activate, .btn-deactivate, .btn-role {
             border: none;
             padding: 8px 12px;
             margin: 2px;
@@ -168,22 +217,7 @@ while ($row = $result->fetch_assoc()) {
 
         .btn-activate { background: #2e7d32; color: white; }
         .btn-deactivate { background: #c62828; color: white; }
-        .btn-view { background: #1565c0; color: white; }
         .btn-role { background: #6a1b9a; color: white; }
-
-        .filter-bar {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 15px;
-        }
-
-        .filter-bar input,
-        .filter-bar select {
-            padding: 8px 10px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-        }
 
         .badge-active {
             background: #d4edda;
@@ -273,7 +307,8 @@ while ($row = $result->fetch_assoc()) {
             flex-wrap: wrap;
         }
 
-        .role-option-wrap button {
+        .role-option-wrap button,
+        .confirm-btn-wrap button {
             border: none;
             padding: 10px 14px;
             border-radius: 8px;
@@ -291,9 +326,37 @@ while ($row = $result->fetch_assoc()) {
             color: #fff;
         }
 
+        .btn-superadmin {
+            background: #6f42c1;
+            color: #fff;
+        }
+
         .btn-cancel {
             background: #6c757d;
             color: #fff;
+        }
+
+        .btn-confirm-activate {
+            background: #2e7d32;
+            color: #fff;
+        }
+
+        .btn-confirm-deactivate {
+            background: #c62828;
+            color: #fff;
+        }
+
+        .last-login-cell small {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .confirm-btn-wrap {
+            display: flex;
+            gap: 10px;
+            margin-top: 18px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
         }
     </style>
 </head>
@@ -371,26 +434,50 @@ while ($row = $result->fetch_assoc()) {
     </div>
 
     <div id="cardaccounts" class="cardaccounts" style="display:block;">
-        <div class="filter-bar">
-            <form method="GET" action="Manage_Accounts.php" style="display:flex; gap:10px; flex-wrap:wrap;">
-                <input type="text" name="search" placeholder="Search name, email, phone" value="<?= htmlspecialchars($search) ?>">
+        <div class="flex1" style="align-items:center; gap: 10px; margin-bottom:10px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:flex-start; margin-top: 8px;">
+                <div class="logo-containeradmin">
+                    <img class="logoadmin" src="images/report.png" alt="Logo">
+                </div>
+                <h3 style="margin-top: 8px; margin-left:5px; color: #443d3d;">Accounts Table</h3>
+            </div>
 
-                <select name="role">
-                    <option value="all" <?= $role_filter === 'all' ? 'selected' : '' ?>>All Roles</option>
-                    <option value="resident" <?= $role_filter === 'resident' ? 'selected' : '' ?>>Resident</option>
-                    <option value="Admin" <?= $role_filter === 'Admin' ? 'selected' : '' ?>>Admin</option>
-                    <option value="SuperAdmin" <?= $role_filter === 'SuperAdmin' ? 'selected' : '' ?>>SuperAdmin</option>
-                </select>
+            <div class="flex3">
+                <form class="resform" method="GET" action="Manage_Accounts.php" id="filterForm">
+                    <div>
+                        <label>Role:</label>
+                        <select class="custom5" name="role" onchange="document.getElementById('filterForm').submit()">
+                            <option value="all" <?= $role_filter === 'all' ? 'selected' : '' ?>>All</option>
+                            <option value="resident" <?= $role_filter === 'resident' ? 'selected' : '' ?>>Resident</option>
+                            <option value="Admin" <?= $role_filter === 'Admin' ? 'selected' : '' ?>>Admin</option>
+                            <option value="SuperAdmin" <?= $role_filter === 'SuperAdmin' ? 'selected' : '' ?>>SuperAdmin</option>
+                        </select>
+                    </div>
 
-                <select name="status">
-                    <option value="all" <?= $status_filter === 'all' ? 'selected' : '' ?>>All Status</option>
-                    <option value="active" <?= $status_filter === 'active' ? 'selected' : '' ?>>Active</option>
-                    <option value="inactive" <?= $status_filter === 'inactive' ? 'selected' : '' ?>>Inactive</option>
-                    <option value="pending" <?= $status_filter === 'pending' ? 'selected' : '' ?>>Pending</option>
-                    <option value="declined" <?= $status_filter === 'declined' ? 'selected' : '' ?>>Declined</option>
-                </select>
+                    <div>
+                        <label>Status:</label>
+                        <select class="custom3" name="status" onchange="document.getElementById('filterForm').submit()">
+                            <option value="all" <?= $status_filter === 'all' ? 'selected' : '' ?>>All</option>
+                            <option value="active" <?= $status_filter === 'active' ? 'selected' : '' ?>>Active</option>
+                            <option value="inactive" <?= $status_filter === 'inactive' ? 'selected' : '' ?>>Inactive</option>
+                            <option value="pending" <?= $status_filter === 'pending' ? 'selected' : '' ?>>Pending</option>
+                            <option value="declined" <?= $status_filter === 'declined' ? 'selected' : '' ?>>Declined</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
 
-                <button type="submit" class="btn-view">Filter</button>
+            <form method="GET" action="Manage_Accounts.php" id="searchForm">
+                <input
+                    class="searches"
+                    placeholder="Search"
+                    type="search"
+                    name="search"
+                    value="<?= htmlspecialchars($search) ?>"
+                    onchange="document.getElementById('searchForm').submit()"
+                >
+                <input type="hidden" name="role" value="<?= htmlspecialchars($role_filter) ?>">
+                <input type="hidden" name="status" value="<?= htmlspecialchars($status_filter) ?>">
             </form>
         </div>
 
@@ -426,8 +513,8 @@ while ($row = $result->fetch_assoc()) {
                                     <span class="badge-pending"><?= htmlspecialchars(ucfirst($row["status"])) ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td>
-                                <?= !empty($row["last_login"]) ? date("M d, Y h:i A", strtotime($row["last_login"])) : "Never" ?>
+                            <td class="last-login-cell">
+                                <?= formatLastLogin($row["last_login"]) ?>
                             </td>
                             <td>
                                 <?php if ((int)$row["id"] === (int)$_SESSION["user_id"]): ?>
@@ -435,17 +522,21 @@ while ($row = $result->fetch_assoc()) {
                                 <?php else: ?>
                                     <div class="action-wrap">
                                         <?php if ($row["status"] === "active"): ?>
-                                            <form method="POST" style="display:inline;">
-                                                <input type="hidden" name="account_id" value="<?= (int)$row["id"] ?>">
-                                                <input type="hidden" name="toggle_status" value="deactivate">
-                                                <button type="submit" class="btn-deactivate">Deactivate</button>
-                                            </form>
+                                            <button
+                                                type="button"
+                                                class="btn-deactivate"
+                                                onclick="openStatusModal(<?= (int)$row['id'] ?>, 'deactivate', '<?= htmlspecialchars($row['fullname'], ENT_QUOTES) ?>')"
+                                            >
+                                                Deactivate
+                                            </button>
                                         <?php else: ?>
-                                            <form method="POST" style="display:inline;">
-                                                <input type="hidden" name="account_id" value="<?= (int)$row["id"] ?>">
-                                                <input type="hidden" name="toggle_status" value="activate">
-                                                <button type="submit" class="btn-activate">Activate</button>
-                                            </form>
+                                            <button
+                                                type="button"
+                                                class="btn-activate"
+                                                onclick="openStatusModal(<?= (int)$row['id'] ?>, 'activate', '<?= htmlspecialchars($row['fullname'], ENT_QUOTES) ?>')"
+                                            >
+                                                Activate
+                                            </button>
                                         <?php endif; ?>
 
                                         <button
@@ -484,7 +575,26 @@ while ($row = $result->fetch_assoc()) {
             <div class="role-option-wrap">
                 <button type="button" class="btn-admin" onclick="submitRoleChange('Admin')">Set as Admin</button>
                 <button type="button" class="btn-resident" onclick="submitRoleChange('resident')">Set as Resident</button>
+                <button type="button" class="btn-superadmin" onclick="submitRoleChange('SuperAdmin')">Set as SuperAdmin</button>
                 <button type="button" class="btn-cancel" onclick="closeRoleModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="statusConfirmModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeStatusModal()">&times;</span>
+        <h2 class="modal-title" id="statusModalTitle">Confirm Action</h2>
+        <p id="statusModalText">Are you sure?</p>
+
+        <form method="POST" id="statusConfirmForm">
+            <input type="hidden" name="account_id" id="statusAccountId" value="">
+            <input type="hidden" name="toggle_status" id="statusActionValue" value="">
+
+            <div class="confirm-btn-wrap">
+                <button type="button" class="btn-cancel" onclick="closeStatusModal()">Cancel</button>
+                <button type="submit" id="statusConfirmButton" class="btn-confirm-deactivate">Confirm</button>
             </div>
         </form>
     </div>
@@ -509,13 +619,52 @@ function submitRoleChange(role) {
     document.getElementById("changeRoleForm").submit();
 }
 
+function openStatusModal(accountId, action, fullName) {
+    document.getElementById("statusAccountId").value = accountId;
+    document.getElementById("statusActionValue").value = action;
+
+    const title = document.getElementById("statusModalTitle");
+    const text = document.getElementById("statusModalText");
+    const button = document.getElementById("statusConfirmButton");
+
+    if (action === "activate") {
+        title.innerText = "Activate Account";
+        text.innerText = "Are you sure you want to activate this account for " + fullName + "?";
+        button.innerText = "Activate";
+        button.className = "btn-confirm-activate";
+    } else {
+        title.innerText = "Deactivate Account";
+        text.innerText = "Are you sure you want to deactivate this account for " + fullName + "?";
+        button.innerText = "Deactivate";
+        button.className = "btn-confirm-deactivate";
+    }
+
+    document.getElementById("statusConfirmModal").style.display = "block";
+}
+
+function closeStatusModal() {
+    document.getElementById("statusConfirmModal").style.display = "none";
+}
+
 window.onclick = function(event) {
     const roleModal = document.getElementById("roleModal");
+    const statusModal = document.getElementById("statusConfirmModal");
+
     if (event.target === roleModal) {
         roleModal.style.display = "none";
     }
+
+    if (event.target === statusModal) {
+        statusModal.style.display = "none";
+    }
 }
 </script>
+
+<?php if (!empty($successMessage)): ?>
+<script>
+alert(<?= json_encode($successMessage) ?>);
+</script>
+<?php endif; ?>
 
 </body>
 </html>

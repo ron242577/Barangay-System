@@ -3,12 +3,12 @@ session_start();
 include "db.php";
 
 $error = "";
+$resetMessage = "";
 
-// clear follow-up session by default (prevents old IDs being reused)
+// clear follow-up session by default
 unset($_SESSION["followup_account_id"]);
 
-// OTP-based password reset is now handled by send_otp.php and verify_otp.php
-// The modal is purely client-side with AJAX requests
+// OTP-based password reset is handled by send_otp.php and verify_otp.php
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
     $email = trim($_POST["email"] ?? "");
@@ -23,14 +23,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
 
         if ($user["status"] === "pending") {
             $error = "pending";
-
-            // ✅ store account id for follow-up (not a login)
             $_SESSION["followup_account_id"] = (int)$user["id"];
 
         } elseif ($user["status"] === "declined") {
             $error = "declined";
+            $_SESSION["followup_account_id"] = (int)$user["id"];
 
-            // ✅ store account id for follow-up (not a login)
+        } elseif ($user["status"] === "inactive") {
+            $error = "inactive";
             $_SESSION["followup_account_id"] = (int)$user["id"];
 
         } else {
@@ -53,7 +53,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
             }
 
             if ($loginSuccess) {
-                // Session values
                 $_SESSION["user_id"] = $user["id"];
                 $_SESSION["fullname"] = $user["fullname"];
                 $_SESSION["email"] = $email;
@@ -87,7 +86,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
     $stmt->close();
 }
 ?>
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -201,7 +199,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
 
         .forgot-password:hover { color: #1a4d2e; }
 
-        /* Modal for password reset */
         .modal {
             position: fixed;
             top: 0;
@@ -282,7 +279,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
             <div class="login-header">
                 <h2>Welcome Back</h2>
                 <p>Please login to access your account</p>
-                <?php if(isset($error)) { echo "<div style='color: #dc3545; font-size: 14px; margin-top: 10px; text-align: center;'>$error</div>"; } ?>
+                <?php if(isset($error) && $error !== "pending" && $error !== "declined" && $error !== "inactive") { echo "<div style='color: #dc3545; font-size: 14px; margin-top: 10px; text-align: center;'>" . htmlspecialchars($error) . "</div>"; } ?>
             </div>
 
             <form id="loginForm" method="POST" action="">
@@ -317,13 +314,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
                 </div>
             </form>
 
-            <!-- Forgot Password Modal - OTP-Based 2 Step -->
+            <!-- Forgot Password Modal -->
             <div id="resetModal" class="modal" style="display:none;">
                 <div class="modal-content" style="max-width: 450px;">
                     <span class="close" id="resetClose">&times;</span>
                     <h2>Reset Password</h2>
                     
-                    <!-- Step 1: Enter Email -->
                     <div id="resetStep1" style="display: block;">
                         <p>Enter your email to receive an OTP code.</p>
                         <div class="form-group">
@@ -334,7 +330,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
                         <button type="button" class="login-btn" id="sendOtpBtn" onclick="sendOTP()">Send OTP</button>
                     </div>
 
-                    <!-- Step 2: Verify OTP and Set New Password -->
                     <div id="resetStep2" style="display: none;">
                         <p>Enter the OTP sent to your email and set a new password.</p>
                         <div class="form-group">
@@ -427,7 +422,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
             });
         }
 
-        // Close modal when clicking outside
         window.addEventListener('click', function(e) {
             if (e.target === resetModal) {
                 resetModal.style.display = 'none';
@@ -435,11 +429,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
             }
         });
 
-        // ===== OTP Password Reset Functions =====
+        let resetEmail = '';
 
-        let resetEmail = '';  // Store email across steps
-
-        // Reset form to Step 1
         function resetForm() {
             document.getElementById('resetStep1').style.display = 'block';
             document.getElementById('resetStep2').style.display = 'none';
@@ -451,10 +442,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
             document.getElementById('step2Message').style.display = 'none';
             document.getElementById('sendOtpBtn').disabled = false;
             document.getElementById('sendOtpBtn').textContent = 'Send OTP';
+            document.getElementById('verifyOtpBtn').disabled = false;
+            document.getElementById('verifyOtpBtn').textContent = 'Reset Password';
             resetEmail = '';
         }
 
-        // Step 1: Send OTP to email
         function sendOTP() {
             const email = document.getElementById('reset_email').value.trim();
             const msgDiv = document.getElementById('step1Message');
@@ -491,7 +483,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
                     msgDiv.textContent = data.message;
                     msgDiv.style.display = 'block';
 
-                    // Move to Step 2 after 1 second
                     setTimeout(() => {
                         document.getElementById('resetStep1').style.display = 'none';
                         document.getElementById('resetStep2').style.display = 'block';
@@ -518,7 +509,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
             });
         }
 
-        // Step 2: Verify OTP and reset password
         function verifyOTP() {
             const otp = document.getElementById('otp_code').value.trim();
             const newPassword = document.getElementById('reset_new_password').value;
@@ -528,7 +518,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
 
             msgDiv.style.display = 'none';
 
-            // Validation
             if (!otp || otp.length !== 6 || isNaN(otp)) {
                 msgDiv.style.background = '#f8d7da';
                 msgDiv.style.color = '#721c24';
@@ -587,7 +576,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
                     msgDiv.textContent = data.message;
                     msgDiv.style.display = 'block';
 
-                    // Close modal after 2 seconds
                     setTimeout(() => {
                         resetModal.style.display = 'none';
                         resetForm();
@@ -613,27 +601,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
             });
         }
 
-        // Allow Enter key to send OTP in Step 1
         document.getElementById('reset_email').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && document.getElementById('resetStep1').style.display !== 'none') {
                 sendOTP();
             }
         });
 
-        // Allow Enter key to verify OTP in Step 2
         document.getElementById('reset_confirm_password').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && document.getElementById('resetStep2').style.display !== 'none') {
                 verifyOTP();
             }
         });
 
-        window.addEventListener('click', function(e) {
-            if (e.target === resetModal) {
-                resetModal.style.display = 'none';
-            }
-        });
-
-        // Show reset modal if server returned a reset message (e.g., success or error)
         <?php if (!empty($resetMessage)): ?>
             resetModal.style.display = 'flex';
         <?php endif; ?>
@@ -653,7 +632,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
             document.getElementById("followUpStatus").innerText = "";
         }
 
-        // ✅ Send only message. Email will be fetched from DB using followup_account_id in session.
         function sendFollowUp(){
             const message = document.getElementById("followUpMessage").value.trim();
 
@@ -677,17 +655,39 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
             });
         }
 
-        <?php if($error === "pending" || $error === "declined"): ?>
+        <?php if($error === "pending" || $error === "declined" || $error === "inactive"): ?>
         document.addEventListener("DOMContentLoaded", function(){
             document.getElementById("statusModal").style.display = "flex";
-            document.getElementById("modalTitle").innerText = "<?php echo ($error === 'pending') ? 'Account Pending' : 'Account Declined'; ?>";
-            document.getElementById("modalMessage").innerText = "<?php echo ($error === 'pending') ? 'Your account is still pending approval. Please wait for the administrator.' : 'Your account has been declined. You can contact the admin for follow-up.'; ?>";
+
+            <?php if($error === "pending"): ?>
+                document.getElementById("modalTitle").innerText = "Account Pending";
+                document.getElementById("modalMessage").innerText = "Your account is still pending approval. Please wait for the administrator.";
+            <?php elseif($error === "declined"): ?>
+                document.getElementById("modalTitle").innerText = "Account Declined";
+                document.getElementById("modalMessage").innerText = "Your account has been declined. You can contact the admin for follow-up.";
+            <?php elseif($error === "inactive"): ?>
+                document.getElementById("modalTitle").innerText = "Account Deactivated";
+                document.getElementById("modalMessage").innerText = "Your account is deactivated. You can contact the admin for follow-up.";
+            <?php endif; ?>
 
             const contactBtn = document.getElementById("contactBtn");
             contactBtn.style.display = "inline-block";
             contactBtn.onclick = openFollowUpModal;
         });
         <?php endif; ?>
+
+        window.addEventListener('click', function(e) {
+            const statusModal = document.getElementById("statusModal");
+            const followUpModal = document.getElementById("followUpModal");
+
+            if (e.target === statusModal) {
+                statusModal.style.display = "none";
+            }
+
+            if (e.target === followUpModal) {
+                followUpModal.style.display = "none";
+            }
+        });
     </script>
 
     <!-- STATUS MODAL -->
