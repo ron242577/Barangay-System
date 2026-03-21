@@ -106,12 +106,7 @@ if (isset($_POST['action']) && isset($_POST['account_id'])) {
     $getEmail->close();
 
     $status = ($action === 'approve') ? 'active' : 'declined';
-
-    // ✅ Get the role from the form if approving
-    $role = 'resident'; // default role
-    if ($action === 'approve' && isset($_POST['selected_role'])) {
-        $role = $_POST['selected_role'];
-    }
+    $role = 'resident';
 
     $sql = "UPDATE accounts SET status = ?, role = ? WHERE id = ?";
     $stmt = $conn->prepare($sql);
@@ -842,20 +837,16 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
       <h2 style="margin-top:0px; margin-bottom:10px;">Approve Account</h2>
       <hr style="width:100%;">
       <div class="modal-info1">
-        <p ><strong style="margin-right:10px;">Account Name:</strong><span id="approveAccountName"></span></p>
-  
-        <div style="margin: 15px 0; display: flex; gap: 15px; flex-wrap: wrap;">
-                <p style="margin-top: 5px;"><strong>Select Role:</strong></p>
-          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-            <input type="radio" name="approveRole" value="resident" checked>
-            <span>Resident</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-            <input type="radio" name="approveRole" value="admin">
-            <span>Admin</span>
-          </label>
-        </div>
+        <p><strong style="margin-right:10px;">Account Name:</strong><span id="approveAccountName"></span></p>
+        <p style="margin-top: 20px; font-size: 16px; font-weight: bold;">Are you sure you want to approve this account?</p>
       </div>
+
+      <div class="btn-row">
+        <button type="button" class="btn-basic btn-gray" onclick="closeApproveModal()">Cancel</button>
+        <button type="button" class="btn-basic btn-blue" onclick="submitApprove()">Approve</button>
+      </div>
+    </div>
+  </div>
 
       <div class="btn-row">
         <button type="button" class="btn-basic btn-gray" onclick="closeApproveModal()">Cancel</button>
@@ -987,7 +978,6 @@ let currentApproveAccountId = null;
 function openApproveModal(accountId, accountName) {
     currentApproveAccountId = accountId;
     document.getElementById('approveAccountName').innerText = accountName;
-    document.querySelector('input[name="approveRole"][value="resident"]').checked = true;
     document.getElementById('approveModal').style.display = 'block';
 }
 

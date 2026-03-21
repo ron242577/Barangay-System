@@ -513,7 +513,7 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
 <?php endif; ?>
   <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
     <img class="icon" src="images/add-user.png" alt="home" /> 
-    <h4 class="text">Accounts</h4>
+    <h4 class="text">Pending Accounts</h4>
   </div>
 
   <div class="btncontainer" onclick="window.location.href='Request.php'">
