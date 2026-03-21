@@ -521,10 +521,15 @@ $stmt->close();
     <h4 class="text">Dashboard</h4>
   </div>
 <?php endif; ?>
-
+<?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+<div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+    <img class="icon" src="images/add-user.png" alt="manage accounts" />
+    <h4 class="text">Manage Accounts</h4>
+</div>
+<?php endif; ?>
   <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
     <img class="icon" src="images/add-user.png" alt="home" />
-    <h4 class="text">Accounts</h4>
+    <h4 class="text">Pending Accounts</h4>
   </div>
 
   <div class="btncontainer" onclick="window.location.href='Request.php'">
@@ -546,12 +551,7 @@ $stmt->close();
     <img class="icon" src="images/fbicon.png" alt="request" />
     <h4 class="text">Feedback</h4>
   </div>
-  <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
-<div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
-    <img class="icon" src="images/add-user.png" alt="manage accounts" />
-    <h4 class="text">Manage Accounts</h4>
-</div>
-<?php endif; ?>
+  
     <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
 
     <div class="address1" >
@@ -647,13 +647,6 @@ $stmt->close();
       <div class="flex3">
     <form  class="resform"method="GET" action="Donate.php" id="filterForm">
 
-    <div>
-      <select class="custom6" name="status" onchange="document.getElementById('filterForm').submit()">
-        <option value="">All</option>
-        <option value="New" <?= $status_filter === 'New' ? 'selected' : '' ?>>New</option>
-        <option value="Claimed" <?= $status_filter === 'Claimed' ? 'selected' : '' ?>>Claimed</option>
-      </select>
-  </div>
 
       <div>
         <label>Day:</label>
@@ -691,7 +684,6 @@ $stmt->close();
   <th>Resident Id</th>
   <th>Resident Name</th>
   <th>Date Donated</th>
-  <th>Status</th>
   <th>Actions</th>
 </tr>
 <?php if (empty($donations)): ?>
@@ -703,7 +695,6 @@ $stmt->close();
   <td>RES-<?= str_pad($donation['resident_id'], 3, '0', STR_PAD_LEFT) ?></td>
   <td><?= htmlspecialchars($donation['resident_name']) ?></td>
   <td><?= date('m-d-Y h:i A', strtotime($donation['created_at'])) ?></td>
-  <td><?= htmlspecialchars($donation['status']) ?></td>
   <td style="text-align:center;">
     <button class="btn-view" onclick="viewDonation(<?= htmlspecialchars(json_encode($donation)) ?>)">View</button>
   </td>

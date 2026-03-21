@@ -292,7 +292,7 @@ if (isset($_POST['submit'])) {
 /* =========================
    ADMIN APPROVE REQUEST
 ========================= */
-if (isset($_POST['approve']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
+if (isset($_POST['approve']) && $_SESSION['role'] === 'Admin') {
     $id = (int)$_POST['request_id'];
 
     $getInfo = $conn->prepare("SELECT r.document_type, a.email, a.fullname FROM requests r INNER JOIN accounts a ON r.user_id = a.id WHERE r.request_id = ?");
@@ -319,7 +319,7 @@ if (isset($_POST['approve']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmi
 /* =========================
    ADMIN DECLINE REQUEST
 ========================= */
-if (isset($_POST['decline']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
+if (isset($_POST['decline']) && $_SESSION['role'] === 'Admin') {
     $id = (int)$_POST['request_id'];
     $decline_reason = isset($_POST['decline_reason']) ? trim($_POST['decline_reason']) : '';
 
@@ -344,7 +344,7 @@ $search = isset($_GET['search']) ? $_GET['search'] : '';
 /* ==========================
    GENERATE REPORT
 ========================== */
-if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
+if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] === 'Admin') {
 
     $sql = "SELECT 
                 r.request_id,
@@ -629,10 +629,15 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['r
             <h4 class="text">Dashboard</h4>
         </div>
     <?php endif; ?>
-
+<?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+        <div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+            <img class="icon" src="images/add-user.png" alt="manage accounts" />
+            <h4 class="text">Manage Accounts</h4>
+        </div>
+    <?php endif; ?>
     <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
         <img class="icon" src="images/add-user.png" alt="home" />
-        <h4 class="text">Accounts</h4>
+        <h4 class="text">Pending Accounts</h4>
     </div>
 
     <div class="btncontainer" onclick="window.location.href='Request.php'">
@@ -655,12 +660,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['r
         <h4 class="text">Feedback</h4>
     </div>
 
-    <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
-        <div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
-            <img class="icon" src="images/add-user.png" alt="manage accounts" />
-            <h4 class="text">Manage Accounts</h4>
-        </div>
-    <?php endif; ?>
+    
 
     <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
 
@@ -916,11 +916,17 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['r
                 echo "<td>" . htmlspecialchars($row['document_type']) . "</td>";
                 echo "<td>" . htmlspecialchars($row['date_requested']) . "</td>";
                 echo "<td>" . htmlspecialchars(ucfirst($row['status'])) . "</td>";
-                echo "<td>
-                    <button class='btn-view' onclick='viewRequest(" . (int)$row['request_id'] . ")'>View</button>
-                    <button class='btn-approve' onclick='openApprovalModal(" . (int)$row['request_id'] . ")'>Approve</button>
-                    <button class='btn-decline' onclick='openDeclineModal(" . (int)$row['request_id'] . ")'>Decline</button>
-                  </td>";
+                if ($_SESSION['role'] === 'Admin') {
+                    echo "<td>
+                        <button class='btn-view' onclick='viewRequest(" . (int)$row['request_id'] . ")'>View</button>
+                        <button class='btn-approve' onclick='openApprovalModal(" . (int)$row['request_id'] . ")'>Approve</button>
+                        <button class='btn-decline' onclick='openDeclineModal(" . (int)$row['request_id'] . ")'>Decline</button>
+                    </td>";
+                } elseif ($_SESSION['role'] === 'SuperAdmin') {
+                    echo "<td>
+                        <button class='btn-view' onclick='viewRequest(" . (int)$row['request_id'] . ")'>View</button>
+                    </td>";
+                }
                 echo "</tr>";
             }
         } else {

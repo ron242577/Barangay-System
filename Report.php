@@ -137,7 +137,7 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
 /* =========================
    ADMIN RESOLVE REPORT
 ========================= */
-if (isset($_POST['resolve']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
+if (isset($_POST['resolve']) && $_SESSION['role'] === 'Admin') {
     $id = (int)$_POST['report_id'];
     $conn->query("UPDATE reports SET status='Resolved' WHERE id=$id");
     header("Location: Report.php");
@@ -147,7 +147,7 @@ if (isset($_POST['resolve']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmi
 /* =========================
    ADMIN DECLINE REPORT
 ========================= */
-if (isset($_POST['decline']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
+if (isset($_POST['decline']) && $_SESSION['role'] === 'Admin') {
     $id = (int)$_POST['report_id'];
     $decline_reason = isset($_POST['decline_reason']) ? trim($_POST['decline_reason']) : '';
 
@@ -172,7 +172,7 @@ $search = isset($_GET['search']) ? $_GET['search'] : '';
 /* ==========================
    GENERATE REPORT (PRINTABLE PDF VIA BROWSER PRINT)
 ========================== */
-if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
+if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] === 'Admin') {
     $sql = "SELECT 
                 r.id,
                 r.reason,
@@ -510,11 +510,6 @@ if (in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
     border-radius: 4px;
 }
 .btn-report {
-    background: #1a73e8;
-    color: white;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 8px;
     cursor: pointer;
 }
 .table-container { overflow-x: auto; }
@@ -547,10 +542,15 @@ if (in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
         <h4 class="text">Dashboard</h4>
     </div>
     <?php endif; ?>
-
+<?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+    <div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+        <img class="icon" src="images/add-user.png" alt="manage accounts" />
+        <h4 class="text">Manage Accounts</h4>
+    </div>
+    <?php endif; ?>
     <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
         <img class="icon" src="images/add-user.png" alt="home" />
-        <h4 class="text">Accounts</h4>
+        <h4 class="text">Pending Accounts</h4>
     </div>
 
     <div class="btncontainer" onclick="window.location.href='Request.php'">
@@ -573,12 +573,7 @@ if (in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
         <h4 class="text">Feedback</h4>
     </div>
 
-    <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
-    <div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
-        <img class="icon" src="images/add-user.png" alt="manage accounts" />
-        <h4 class="text">Manage Accounts</h4>
-    </div>
-    <?php endif; ?>
+    
 
     <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
 
@@ -764,10 +759,14 @@ if (in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
                             <td><?= htmlspecialchars(ucfirst($row['status'])) ?></td>
                             <td><?= htmlspecialchars($row['reason']) ?></td>
                             <td>
-                                <button class="btn-view" onclick="viewReport(<?= (int)$row['id'] ?>)">View</button>
-                                <button class="btn-resolve" onclick="openResolveModal(<?= (int)$row['id'] ?>)">Resolve</button>
-                                <button class="btn-decline" onclick="openDeclineModal(<?= (int)$row['id'] ?>)">Decline</button>
-                            </td>
+                              <?php if ($_SESSION['role'] === 'Admin'): ?>
+                                  <button class="btn-view" onclick="viewReport(<?= (int)$row['id'] ?>)">View</button>
+                                  <button class="btn-resolve" onclick="openResolveModal(<?= (int)$row['id'] ?>)">Resolve</button>
+                                  <button class="btn-decline" onclick="openDeclineModal(<?= (int)$row['id'] ?>)">Decline</button>
+                              <?php elseif ($_SESSION['role'] === 'SuperAdmin'): ?>
+                                  <button class="btn-view" onclick="viewReport(<?= (int)$row['id'] ?>)">View</button>
+                              <?php endif; ?>
+                          </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>

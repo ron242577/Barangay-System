@@ -380,9 +380,14 @@ while ($row = $result->fetch_assoc()) {
         <h4 class="text">Dashboard</h4>
     </div>
 
+    <div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+        <img class="icon" src="images/add-user.png" alt="manage accounts" />
+        <h4 class="text">Manage Accounts</h4>
+    </div>
+
     <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
         <img class="icon" src="images/add-user.png" alt="home" />
-        <h4 class="text">Accounts</h4>
+        <h4 class="text">Pending Accounts</h4>
     </div>
 
     <div class="btncontainer" onclick="window.location.href='Request.php'">
@@ -403,11 +408,6 @@ while ($row = $result->fetch_assoc()) {
     <div class="btncontainer" onclick="window.location.href='Feedback.php'">
         <img class="icon" src="images/fbicon.png" alt="feedback" />
         <h4 class="text">Feedback</h4>
-    </div>
-
-    <div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
-        <img class="icon" src="images/add-user.png" alt="manage accounts" />
-        <h4 class="text">Manage Accounts</h4>
     </div>
 
     <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">

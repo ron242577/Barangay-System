@@ -289,7 +289,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['r
                     <th>Feedback ID</th>
                     <th>Resident ID</th>
                     <th>Resident Name</th>
-                    <th>Status</th>
                     <th>Feedback</th>
                     <th>Date Submitted</th>
                 </tr>
@@ -301,7 +300,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['r
                             <td>FB-<?= str_pad($f['id'], 3, '0', STR_PAD_LEFT) ?></td>
                             <td>RES-<?= str_pad($f['resident_id'], 3, '0', STR_PAD_LEFT) ?></td>
                             <td><?= htmlspecialchars($f['resident_name']) ?></td>
-                            <td><?= htmlspecialchars($f['status']) ?></td>
                             <td><?= htmlspecialchars($f['feedback_text']) ?></td>
                             <td><?= date('m-d-Y h:i A', strtotime($f['created_at'])) ?></td>
                         </tr>
@@ -533,10 +531,15 @@ $stmt->close();
     <h4 class="text">Dashboard</h4>
   </div>
 <?php endif; ?>
-
+<?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+<div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+    <img class="icon" src="images/add-user.png" alt="manage accounts" />
+    <h4 class="text">Manage Accounts</h4>
+</div>
+<?php endif; ?>
   <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
     <img class="icon" src="images/add-user.png" alt="home" />
-    <h4 class="text">Accounts</h4>
+    <h4 class="text">Pending Accounts</h4>
   </div>
 
   <div class="btncontainer" onclick="window.location.href='Request.php'">
@@ -558,12 +561,7 @@ $stmt->close();
     <img class="icon" src="images/fbicon.png" alt="request" />
     <h4 class="text">Feedback</h4>
   </div>
-  <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
-<div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
-    <img class="icon" src="images/add-user.png" alt="manage accounts" />
-    <h4 class="text">Manage Accounts</h4>
-</div>
-<?php endif; ?>
+  
     <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
 
     <div class="address1" >
@@ -657,15 +655,6 @@ $stmt->close();
 
   <div class="flex3">
       <form class="resform"method="GET" action="Feedback.php" id="filterForm">
-
-        <div>
-        <select class="custom8" name="status" onchange="document.getElementById('filterForm').submit()">
-          <option value="">All</option>
-          <option value="New" <?= $status_filter === 'New' ? 'selected' : '' ?>>New</option>
-          <option value="Reviewed" <?= $status_filter === 'Reviewed' ? 'selected' : '' ?>>Reviewed</option>
-          <option value="Declined" <?= $status_filter === 'Declined' ? 'selected' : '' ?>>Declined</option>
-        </select>
-    </div>
 
         <div>
           <label>Day:</label>
