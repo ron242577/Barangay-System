@@ -1,11 +1,11 @@
 <?php
 session_start();
-include "db.php";
-
-if (!isset($_SESSION["user_id"])) {
+if (!isset($_SESSION["role"]) || !in_array($_SESSION["role"], ["Admin", "SuperAdmin"])) {
     header("Location: login.php");
     exit;
 }
+
+include "db.php";
 
 // TOTAL REGISTERED ACCOUNTS
 $totalAccountsQuery = "SELECT COUNT(*) AS total FROM accounts";
@@ -132,7 +132,7 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
 /* =========================
    ADMIN RESOLVE REPORT
 ========================= */
-if (isset($_POST['resolve']) && $_SESSION['role'] === 'Admin') {
+if (isset($_POST['resolve']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
     $id = (int)$_POST['report_id'];
     $conn->query("UPDATE reports SET status='Resolved' WHERE id=$id");
     header("Location: Report.php");
@@ -142,7 +142,7 @@ if (isset($_POST['resolve']) && $_SESSION['role'] === 'Admin') {
 /* =========================
    ADMIN DECLINE REPORT
 ========================= */
-if (isset($_POST['decline']) && $_SESSION['role'] === 'Admin') {
+if (isset($_POST['decline']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
     $id = (int)$_POST['report_id'];
     $decline_reason = isset($_POST['decline_reason']) ? trim($_POST['decline_reason']) : '';
     
@@ -169,7 +169,7 @@ $search = isset($_GET['search']) ? $_GET['search'] : '';
 /* ==========================
    GENERATE REPORT (PRINTABLE PDF VIA BROWSER PRINT)
    ========================== */
-if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] === 'Admin') {
+if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
 
     $sql = "SELECT r.id, r.reason, r.person_reported, r.address, r.proof, r.specify, r.status, r.created_at, a.fullname AS reporter_name 
             FROM reports r 
@@ -501,10 +501,17 @@ $stmt->close();
 
    <hr class="hrside">
 
-   <div class="btncontainer" onclick="window.location.href='Admin_Dashboard.php'">
-     <img class="icon" src="images/dashboard.png" alt="home" /> 
-     <h4 class="text">Dashboard</h4>
-   </div>
+   <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+  <div class="btncontainer" onclick="window.location.href='SuperAdmin_Dashboard.php'">
+    <img class="icon" src="images/dashboard.png" alt="home" /> 
+    <h4 class="text">Dashboard</h4>
+  </div>
+<?php elseif ($_SESSION["role"] === "Admin"): ?>
+  <div class="btncontainer" onclick="window.location.href='Admin_Dashboard.php'">
+    <img class="icon" src="images/dashboard.png" alt="home" /> 
+    <h4 class="text">Dashboard</h4>
+  </div>
+<?php endif; ?>
 
    <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
      <img class="icon" src="images/add-user.png" alt="home" /> 
@@ -530,6 +537,12 @@ $stmt->close();
      <img class="icon" src="images/fbicon.png" alt="request" /> 
      <h4 class="text">Feedback</h4>
    </div>
+   <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+<div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+    <img class="icon" src="images/add-user.png" alt="manage accounts" />
+    <h4 class="text">Manage Accounts</h4>
+</div>
+<?php endif; ?>
      <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
 
      <div class="address1" >
@@ -543,8 +556,6 @@ $stmt->close();
              <img class="logolog" src="images/logout.png" alt="Feedback">
             <h4 class="logout">Logout</h4>
         </div>
-
- 
 </div>
 
 <div class="content">

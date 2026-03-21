@@ -1,6 +1,6 @@
 <?php
 session_start();
-if (!isset($_SESSION["user_id"])) {
+if (!isset($_SESSION["role"]) || !in_array($_SESSION["role"], ["Admin", "SuperAdmin"])) {
     header("Location: login.php");
     exit;
 }
@@ -562,10 +562,17 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
 
    <hr class="hrside">
 
-   <div class="btncontainer" onclick="window.location.href='Admin_Dashboard.php'">
-     <img class="icon" src="images/dashboard.png" alt="home" /> 
-     <h4 class="text">Dashboard</h4>
-   </div>
+   <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+  <div class="btncontainer" onclick="window.location.href='SuperAdmin_Dashboard.php'">
+    <img class="icon" src="images/dashboard.png" alt="home" /> 
+    <h4 class="text">Dashboard</h4>
+  </div>
+<?php elseif ($_SESSION["role"] === "Admin"): ?>
+  <div class="btncontainer" onclick="window.location.href='Admin_Dashboard.php'">
+    <img class="icon" src="images/dashboard.png" alt="home" /> 
+    <h4 class="text">Dashboard</h4>
+  </div>
+<?php endif; ?>
 
    <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
      <img class="icon" src="images/add-user.png" alt="home" /> 
@@ -591,6 +598,12 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
      <img class="icon" src="images/fbicon.png" alt="feedback" /> 
      <h4 class="text">Feedback</h4>
    </div>
+   <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+<div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+    <img class="icon" src="images/add-user.png" alt="manage accounts" />
+    <h4 class="text">Manage Accounts</h4>
+</div>
+<?php endif; ?>
      <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
      
 <div class="address1" >

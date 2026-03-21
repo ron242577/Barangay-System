@@ -1,29 +1,71 @@
 <?php
 session_start();
-include "db.php";
+include 'db.php';
 
 if (!isset($_SESSION["user_id"])) {
     header("Location: login.php");
     exit;
 }
 
+if (!isset($_SESSION["role"]) || !in_array($_SESSION["role"], ['resident', 'Admin', 'SuperAdmin'])) {
+    header("Location: login.php");
+    exit;
+}
+
+/*
+|--------------------------------------------------------------------------
+| PHPMailer loader
+|--------------------------------------------------------------------------
+| Try Composer autoload first.
+| If unavailable or incomplete, load PHPMailer manually.
+*/
+$phpMailerLoaded = false;
+
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+    $phpMailerLoaded = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
+}
+
+if (!$phpMailerLoaded) {
+    $phpMailerFiles = [
+        __DIR__ . '/vendor/phpmailer/phpmailer/src/Exception.php',
+        __DIR__ . '/vendor/phpmailer/phpmailer/src/PHPMailer.php',
+        __DIR__ . '/vendor/phpmailer/phpmailer/src/SMTP.php',
+    ];
+
+    $allFilesExist = true;
+    foreach ($phpMailerFiles as $file) {
+        if (!file_exists($file)) {
+            $allFilesExist = false;
+            break;
+        }
+    }
+
+    if ($allFilesExist) {
+        require_once __DIR__ . '/vendor/phpmailer/phpmailer/src/Exception.php';
+        require_once __DIR__ . '/vendor/phpmailer/phpmailer/src/PHPMailer.php';
+        require_once __DIR__ . '/vendor/phpmailer/phpmailer/src/SMTP.php';
+        $phpMailerLoaded = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
+    }
+}
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 // ========================================
 // FUNCTION: Send Request Approval Email
 // ========================================
 function sendRequestApprovalEmail($email, $fullname, $document_type) {
+    if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        error_log("PHPMailer is not installed or not loaded.");
+        return false;
+    }
+
     try {
-        // Gmail SMTP Configuration
         $mail_user = 'pikachu242577@gmail.com';
         $mail_pass = 'zjlxukghikzifknf';
 
-        // Check if PHPMailer exists
-        if (!file_exists('vendor/autoload.php')) {
-            error_log("PHPMailer not found for request approval email to: $email");
-            return false;
-        }
-
-        require 'vendor/autoload.php';
-        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+        $mail = new PHPMailer(true);
 
         // SMTP configuration
         $mail->isSMTP();
@@ -31,21 +73,17 @@ function sendRequestApprovalEmail($email, $fullname, $document_type) {
         $mail->SMTPAuth   = true;
         $mail->Username   = $mail_user;
         $mail->Password   = $mail_pass;
-        $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 
-        // Clear previous recipients
-        $mail->clearAddresses();
-        $mail->clearReplyTos();
-
-        // Sender and Recipient
+        // Sender and recipient
         $mail->setFrom($mail_user, 'Barangay 292 E-Services');
         $mail->addAddress($email, $fullname);
 
         // Email content
         $mail->isHTML(true);
         $mail->Subject = 'Request Approved - Document Ready for Pick Up - Barangay 292 E-Services';
-        $mail->Body    = "
+        $mail->Body = "
             <html>
             <head>
                 <style>
@@ -83,7 +121,6 @@ function sendRequestApprovalEmail($email, $fullname, $document_type) {
         ";
         $mail->AltBody = "Your requested document is ready for pick up. Please visit the Barangay Office to collect it.";
 
-        // Send email
         return $mail->send();
 
     } catch (Exception $e) {
@@ -97,12 +134,12 @@ $totalAccountsQuery = "SELECT COUNT(*) AS total FROM accounts";
 $totalAccountsResult = $conn->query($totalAccountsQuery);
 $totalAccounts = $totalAccountsResult ? $totalAccountsResult->fetch_assoc()['total'] : 0;
 
-// PENDING ACCOUNTS (like Admin Dashboard: residents only)
+// PENDING ACCOUNTS
 $pendingAccountsQuery = "SELECT COUNT(*) AS total FROM accounts WHERE status = 'pending' AND role = 'resident'";
 $pendingAccountsResult = $conn->query($pendingAccountsQuery);
 $pendingAccounts = $pendingAccountsResult ? $pendingAccountsResult->fetch_assoc()['total'] : 0;
 
-// PENDING REQUESTS (support Pending/pending)
+// PENDING REQUESTS
 $pendingRequestsQuery = "SELECT COUNT(*) AS total FROM requests WHERE status IN ('pending','Pending')";
 $pendingRequestsResult = $conn->query($pendingRequestsQuery);
 $pendingRequests = $pendingRequestsResult ? $pendingRequestsResult->fetch_assoc()['total'] : 0;
@@ -122,7 +159,7 @@ $pendingFeedbacksQuery = "SELECT COUNT(*) AS total FROM feedbacks WHERE status =
 $pendingFeedbacksResult = $conn->query($pendingFeedbacksQuery);
 $pendingFeedbacks = $pendingFeedbacksResult ? $pendingFeedbacksResult->fetch_assoc()['total'] : 0;
 
-// ✅ PENDING FOLLOW-UP MESSAGES (hide if sender email already active)
+// PENDING FOLLOW-UP MESSAGES
 $pendingFollowUpsQuery = "
   SELECT COUNT(*) AS total
   FROM admin_followups af
@@ -136,7 +173,7 @@ $pendingFollowUps = $pendingFollowUpsResult ? $pendingFollowUpsResult->fetch_ass
 // TOTAL PENDING NOTIFICATIONS
 $totalPending = $pendingRequests + $pendingReports + $pendingDonations + $pendingFeedbacks + $pendingAccounts + $pendingFollowUps;
 
-// RECENT NOTIFICATIONS (last 10 items across all types)
+// RECENT NOTIFICATIONS
 $recentNotifications = [];
 
 // Recent Requests
@@ -183,7 +220,7 @@ while ($recentFeedbacksResult && ($row = $recentFeedbacksResult->fetch_assoc()))
     $recentNotifications[] = $row;
 }
 
-// Recent Accounts (resident pending only)
+// Recent Accounts
 $recentAccountsQuery = "SELECT 'Account' AS type, a.id AS id, CONCAT('New account: ', a.fullname) AS details, a.created_at AS date, a.fullname AS user
                         FROM accounts a
                         WHERE a.status = 'pending' AND a.role = 'resident'
@@ -193,7 +230,7 @@ while ($recentAccountsResult && ($row = $recentAccountsResult->fetch_assoc())) {
     $recentNotifications[] = $row;
 }
 
-// ✅ Recent Follow-ups (hide if sender email already active)
+// Recent Follow-ups
 $recentFollowUpsQuery = "
   SELECT 'FollowUp' AS type, af.id AS id, af.message AS details, af.created_at AS date, af.sender_email AS user
   FROM admin_followups af
@@ -208,7 +245,7 @@ while ($recentFollowUpsResult && ($row = $recentFollowUpsResult->fetch_assoc()))
     $recentNotifications[] = $row;
 }
 
-// Sort all notifications by date descending
+// Sort notifications
 usort($recentNotifications, function($a, $b) {
     return strtotime($b['date']) - strtotime($a['date']);
 });
@@ -227,7 +264,6 @@ if (isset($_POST['submit'])) {
     $guardian_address = $_POST['guardian_address'] ?? '';
     $guardian_contact = $_POST['guardian_contact'] ?? '';
 
-    // Get resident details from accounts
     $stmt = $conn->prepare("SELECT fullname, address FROM accounts WHERE id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
@@ -256,21 +292,18 @@ if (isset($_POST['submit'])) {
 /* =========================
    ADMIN APPROVE REQUEST
 ========================= */
-if (isset($_POST['approve']) && $_SESSION['role'] === 'Admin') {
+if (isset($_POST['approve']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
     $id = (int)$_POST['request_id'];
-    
-    // Fetch user email, fullname, and document_type before updating
+
     $getInfo = $conn->prepare("SELECT r.document_type, a.email, a.fullname FROM requests r INNER JOIN accounts a ON r.user_id = a.id WHERE r.request_id = ?");
     $getInfo->bind_param("i", $id);
     $getInfo->execute();
     $result = $getInfo->get_result();
     $requestInfo = $result->fetch_assoc();
     $getInfo->close();
-    
-    // Update request status
+
     $conn->query("UPDATE requests SET status='Approved' WHERE request_id=$id");
-    
-    // Send approval email if user info was retrieved
+
     if ($requestInfo && !empty($requestInfo['email'])) {
         sendRequestApprovalEmail(
             $requestInfo['email'],
@@ -278,7 +311,7 @@ if (isset($_POST['approve']) && $_SESSION['role'] === 'Admin') {
             $requestInfo['document_type']
         );
     }
-    
+
     header("Location: Request.php");
     exit;
 }
@@ -286,17 +319,15 @@ if (isset($_POST['approve']) && $_SESSION['role'] === 'Admin') {
 /* =========================
    ADMIN DECLINE REQUEST
 ========================= */
-if (isset($_POST['decline']) && $_SESSION['role'] === 'Admin') {
+if (isset($_POST['decline']) && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
     $id = (int)$_POST['request_id'];
     $decline_reason = isset($_POST['decline_reason']) ? trim($_POST['decline_reason']) : '';
-    
-    // Add decline_reason column if it doesn't exist
+
     $colCheck = $conn->query("SHOW COLUMNS FROM requests LIKE 'decline_reason'");
     if ($colCheck && $colCheck->num_rows === 0) {
         $conn->query("ALTER TABLE requests ADD COLUMN decline_reason TEXT NULL");
     }
-    
-    // Update request with status and reason
+
     $conn->query("UPDATE requests SET status='Declined', decline_reason='" . $conn->real_escape_string($decline_reason) . "' WHERE request_id=$id");
     header("Location: Request.php");
     exit;
@@ -311,9 +342,9 @@ $date_to = isset($_GET['to']) ? $_GET['to'] : '';
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 
 /* ==========================
-   GENERATE REPORT (PRINTABLE PDF VIA BROWSER PRINT)
-   ========================== */
-if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] === 'Admin') {
+   GENERATE REPORT
+========================== */
+if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
 
     $sql = "SELECT 
                 r.request_id,
@@ -397,7 +428,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] ===
     }
 
     $stmt->close();
-    // return to same page with same filters (remove export)
     $qs = $_GET;
     unset($qs['export']);
     $returnUrl = 'Request.php' . (!empty($qs) ? ('?' . http_build_query($qs)) : '');
@@ -410,25 +440,17 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] ===
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Request Report</title>
     <style>
-        body {   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;padding: 20px; }
-        .report-wrap {
-            max-width: 950px;
-            margin: 0 auto;
-            border: 2px solid #6a5acd;
-            padding: 20px;
-        }
+        body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; }
+        .report-wrap { max-width: 950px; margin: 0 auto; border: 2px solid #6a5acd; padding: 20px; }
         .report-header { text-align: center; }
         .report-header img { width: 90px; height: auto; display: block; margin: 0 auto 8px auto; }
         .report-header h2 { margin: 0; font-size: 20px; font-weight: bold; }
         .report-meta { margin-top: 14px; font-size: 14px; }
         .report-meta div { margin: 6px 0; }
-
         .table-title { text-align: center; font-weight: bold; margin: 18px 0 10px 0; }
-
         table { width: 100%; border-collapse: collapse; font-size: 12px; }
         th, td { border: 1px solid #333; padding: 8px; text-align: left; vertical-align: top; }
         th { background: #f2f2f2; }
-
         .no-print { margin-top: 15px; text-align: right; }
         @media print {
             .no-print { display: none; }
@@ -490,14 +512,12 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] ===
                 <button onclick="window.print()">Print / Save as PDF</button>
             </div>
         </div>
-
     </body>
     </html>
     <?php
     exit;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -507,7 +527,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] ===
 <title>Admin Dashboard</title>
 
 <style>
-/* Inline styles for notification badge and dropdown */
 .notification-container {
     position: relative;
     display: inline-block;
@@ -547,7 +566,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] ===
 .notification-dropdown .notification-details { font-size: 14px; margin: 5px 0; }
 .notification-dropdown .notification-date { font-size: 12px; color: #666; }
 
-/* ✅ Notification details modal (same modal style pattern as Admin Dashboard) */
 .modal {
     display:none;
     position:fixed;
@@ -564,7 +582,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] ===
     max-width: 600px;
     border-radius:10px;
     box-shadow:0 8px 25px rgba(0,0,0,0.2);
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 .close {
     float:right;
@@ -587,434 +605,436 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] ===
 <body>
 
 <div class="sidebar">
-      <div class="sideflex">
-   <div class="usercontainer">
-     <img class="user" src="images/usericon.png" alt="Notification" /> 
-   </div>
-
-     <div class="info">
-   <h4 class="username"><?= htmlspecialchars($_SESSION["fullname"]) ?></h4> 
-
-     <h4 class="usertype"><?= htmlspecialchars($_SESSION["role"]) ?></h4>
-   </div>
-</div>
-
-   <hr class="hrside">
-
-   <div class="btncontainer" onclick="window.location.href='Admin_Dashboard.php'">
-     <img class="icon" src="images/dashboard.png" alt="home" /> 
-     <h4 class="text">Dashboard</h4>
-   </div>
-
-   <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
-     <img class="icon" src="images/add-user.png" alt="home" /> 
-     <h4 class="text">Accounts</h4>
-   </div>
-
-   <div class="btncontainer" onclick="window.location.href='Request.php'">
-     <img class="icon" src="images/reqicon.png" alt="request" /> 
-     <h4 class="text">Request</h4>
-   </div>
-
-   <div class="btncontainer" onclick="window.location.href='Report.php'">
-     <img class="icon" src="images/repicon.png" alt="request" /> 
-     <h4 class="text">Report</h4>
-   </div>
-
-   <div class="btncontainer" onclick="window.location.href='Donate.php'">
-     <img class="icon" src="images/dicon.png" alt="request" /> 
-     <h4 class="text">Donate</h4>
-   </div>
-
-   <div class="btncontainer" onclick="window.location.href='Feedback.php'">
-     <img class="icon" src="images/fbicon.png" alt="request" /> 
-     <h4 class="text">Feedback</h4>
-   </div>
-     <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
-
-         <div class="address1" >
-             <img class="logoadd" src="images/pin.png" alt="Feedback">
-             <div class="addtext">
-              <p class=> Zone 28 Disctrict 3 <br>808 Reigna Regente St. <br>Binondo, Manila</p>
-          </div>
-          </div>
-
-     <div class="logoutcontainer" onclick="window.location.href='logout.php'">
-             <img class="logolog" src="images/logout.png" alt="Feedback">
-            <h4 class="logout">Logout</h4>
+    <div class="sideflex">
+        <div class="usercontainer">
+            <img class="user" src="images/usericon.png" alt="Notification" />
         </div>
 
- 
+        <div class="info">
+            <h4 class="username"><?= htmlspecialchars($_SESSION["fullname"]) ?></h4>
+            <h4 class="usertype"><?= htmlspecialchars($_SESSION["role"]) ?></h4>
+        </div>
+    </div>
+
+    <hr class="hrside">
+
+    <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+        <div class="btncontainer" onclick="window.location.href='SuperAdmin_Dashboard.php'">
+            <img class="icon" src="images/dashboard.png" alt="home" />
+            <h4 class="text">Dashboard</h4>
+        </div>
+    <?php elseif ($_SESSION["role"] === "Admin"): ?>
+        <div class="btncontainer" onclick="window.location.href='Admin_Dashboard.php'">
+            <img class="icon" src="images/dashboard.png" alt="home" />
+            <h4 class="text">Dashboard</h4>
+        </div>
+    <?php endif; ?>
+
+    <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
+        <img class="icon" src="images/add-user.png" alt="home" />
+        <h4 class="text">Accounts</h4>
+    </div>
+
+    <div class="btncontainer" onclick="window.location.href='Request.php'">
+        <img class="icon" src="images/reqicon.png" alt="request" />
+        <h4 class="text">Request</h4>
+    </div>
+
+    <div class="btncontainer" onclick="window.location.href='Report.php'">
+        <img class="icon" src="images/repicon.png" alt="request" />
+        <h4 class="text">Report</h4>
+    </div>
+
+    <div class="btncontainer" onclick="window.location.href='Donate.php'">
+        <img class="icon" src="images/dicon.png" alt="request" />
+        <h4 class="text">Donate</h4>
+    </div>
+
+    <div class="btncontainer" onclick="window.location.href='Feedback.php'">
+        <img class="icon" src="images/fbicon.png" alt="request" />
+        <h4 class="text">Feedback</h4>
+    </div>
+
+    <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+        <div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+            <img class="icon" src="images/add-user.png" alt="manage accounts" />
+            <h4 class="text">Manage Accounts</h4>
+        </div>
+    <?php endif; ?>
+
+    <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
+
+    <div class="address1">
+        <img class="logoadd" src="images/pin.png" alt="Feedback">
+        <div class="addtext">
+            <p>Zone 28 Disctrict 3 <br>808 Reigna Regente St. <br>Binondo, Manila</p>
+        </div>
+    </div>
+
+    <div class="logoutcontainer" onclick="window.location.href='logout.php'">
+        <img class="logolog" src="images/logout.png" alt="Feedback">
+        <h4 class="logout">Logout</h4>
+    </div>
 </div>
 
 <div class="content">
 <div class="dashboard-header">
-  <div class="header-left">
-    <img src="images/logo2.png" class="logo">
-    <div class="header-text">
-       <h1 class="res1">Barangay Management & E-Services Platform</h1>
+    <div class="header-left">
+        <img src="images/logo2.png" class="logo">
+        <div class="header-text">
+            <h1 class="res1">Barangay Management & E-Services Platform</h1>
+        </div>
     </div>
-  </div>
 
-  <div class="notification-container" onclick="toggleNotifications()">
-    <img src="images/notification.png" class="header-icon" alt="Notifications">
-    <?php if ($totalPending > 0): ?>
-      <span class="notification-badge"><?= $totalPending ?></span>
-    <?php endif; ?>
-  </div>
+    <div class="notification-container" onclick="toggleNotifications()">
+        <img src="images/notification.png" class="header-icon" alt="Notifications">
+        <?php if ($totalPending > 0): ?>
+            <span class="notification-badge"><?= $totalPending ?></span>
+        <?php endif; ?>
+    </div>
 </div>
 
-<!-- Notification Dropdown -->
 <div id="notificationDropdown" class="notification-dropdown" style="display:none;">
-  <h4>Recent Notifications</h4>
-  <ul>
-    <?php if (empty($recentNotifications)): ?>
-      <li>No new notifications.</li>
-    <?php else: ?>
-      <?php foreach ($recentNotifications as $notif): ?>
-        <?php
-          $type = (string)($notif['type'] ?? '');
-          $id = (int)($notif['id'] ?? 0);
-          $user = (string)($notif['user'] ?? '');
-          $details = (string)($notif['details'] ?? '');
-          $date = (string)($notif['date'] ?? '');
+    <h4>Recent Notifications</h4>
+    <ul>
+        <?php if (empty($recentNotifications)): ?>
+            <li>No new notifications.</li>
+        <?php else: ?>
+            <?php foreach ($recentNotifications as $notif): ?>
+                <?php
+                $type = (string)($notif['type'] ?? '');
+                $id = (int)($notif['id'] ?? 0);
+                $user = (string)($notif['user'] ?? '');
+                $details = (string)($notif['details'] ?? '');
+                $date = (string)($notif['date'] ?? '');
 
-          $typeAttr = htmlspecialchars($type, ENT_QUOTES);
-          $userAttr = htmlspecialchars($user, ENT_QUOTES);
-          $detailsAttr = htmlspecialchars($details, ENT_QUOTES);
-          $dateAttr = htmlspecialchars($date, ENT_QUOTES);
-        ?>
-        <li>
-          <a href="#"
-             class="notification-item"
-             data-type="<?= $typeAttr ?>"
-             data-id="<?= $id ?>"
-             data-user="<?= $userAttr ?>"
-             data-details="<?= $detailsAttr ?>"
-             data-date="<?= $dateAttr ?>"
-             onclick="openNotificationModal(event, this)">
-            <div class="notification-type"><?= htmlspecialchars($type) ?> from <?= htmlspecialchars($user) ?></div>
-            <div class="notification-details"><?= htmlspecialchars(substr($details, 0, 50)) ?>...</div>
-            <div class="notification-date"><?= date('M d, Y H:i', strtotime($date)) ?></div>
-          </a>
-        </li>
-      <?php endforeach; ?>
-    <?php endif; ?>
-  </ul>
+                $typeAttr = htmlspecialchars($type, ENT_QUOTES);
+                $userAttr = htmlspecialchars($user, ENT_QUOTES);
+                $detailsAttr = htmlspecialchars($details, ENT_QUOTES);
+                $dateAttr = htmlspecialchars($date, ENT_QUOTES);
+                ?>
+                <li>
+                    <a href="#"
+                       class="notification-item"
+                       data-type="<?= $typeAttr ?>"
+                       data-id="<?= $id ?>"
+                       data-user="<?= $userAttr ?>"
+                       data-details="<?= $detailsAttr ?>"
+                       data-date="<?= $dateAttr ?>"
+                       onclick="openNotificationModal(event, this)">
+                        <div class="notification-type"><?= htmlspecialchars($type) ?> from <?= htmlspecialchars($user) ?></div>
+                        <div class="notification-details"><?= htmlspecialchars(substr($details, 0, 50)) ?>...</div>
+                        <div class="notification-date"><?= date('M d, Y H:i', strtotime($date)) ?></div>
+                    </a>
+                </li>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </ul>
 </div>
 
-<!-- ✅ NOTIFICATION DETAILS MODAL -->
 <div id="notificationModal" class="modal">
-  <div class="modal-content">
-    <span class="close" onclick="closeNotificationModal()">&times;</span>
-     <div style="display: flex; align-items:flex-start; margin-left:0px;">
-         <div class="logo-containerinfo">
-    <img class="logoa" src="images/info1.png" alt="Logo">
-</div>
-          <h2 class="notiftitle" style=" color: #443d3d;" id="notifTitle">Notification Details</h2>
-    </div>
+    <div class="modal-content">
+        <span class="close" onclick="closeNotificationModal()">&times;</span>
+        <div style="display: flex; align-items:flex-start; margin-left:0px;">
+            <div class="logo-containerinfo">
+                <img class="logoa" src="images/info1.png" alt="Logo">
+            </div>
+            <h2 class="notiftitle" style="color: #443d3d;" id="notifTitle">Notification Details</h2>
+        </div>
         <hr style="width:99%;">
 
-    <div class="notif-info">
-      <div class="row"><span class="label">Type:</span> <span class="value" id="notifType"></span></div>
-      <div class="row"><span class="label">From:</span> <span class="value" id="notifFrom"></span></div>
-      <div class="row"><span class="label">Date:</span> <span class="value" id="notifDate"></span></div>
-      <div class="row"><span class="label">Details:</span></div>
-      <div class="row"><div class="value" id="notifDetails"></div></div>
-    </div>
+        <div class="notif-info">
+            <div class="row"><span class="label">Type:</span> <span class="value" id="notifType"></span></div>
+            <div class="row"><span class="label">From:</span> <span class="value" id="notifFrom"></span></div>
+            <div class="row"><span class="label">Date:</span> <span class="value" id="notifDate"></span></div>
+            <div class="row"><span class="label">Details:</span></div>
+            <div class="row"><div class="value" id="notifDetails"></div></div>
+        </div>
 
-    <div class="btn-row">
-     
-      <button type="button" class="btn-basic btn-blue" id="notifGoBtn">Go to Page</button>
+        <div class="btn-row">
+            <button type="button" class="btn-basic btn-blue" id="notifGoBtn">Go to Page</button>
+        </div>
     </div>
-  </div>
 </div>
 
 <hr class="green-line">
 
-<!-- REQUEST -->
 <div id="cardrequest" class="cardrequest">
-  <div class="flex1" style="align-items:center; gap: 10px; margin-bottom:10px; flex-wrap:wrap;">
-   <div style="display:flex; align-items:flex-start; margin-top: 8px;">
-       <div class="logo-containeradmin">
-    <img class="logoadmin" src="images/report.png" alt="Logo">
-</div>
-  <h3 style="margin-top: 8px; margin-left:5px;  color: #443d3d;">Request Table</h3>
-</div>
+    <div class="flex1" style="align-items:center; gap: 10px; margin-bottom:10px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:flex-start; margin-top: 8px;">
+            <div class="logo-containeradmin">
+                <img class="logoadmin" src="images/report.png" alt="Logo">
+            </div>
+            <h3 style="margin-top: 8px; margin-left:5px; color: #443d3d;">Request Table</h3>
+        </div>
 
+        <div class="flex3">
+            <form class="resform" method="GET" action="Request.php" id="filterForm">
+                <div>
+                    <label>Status:</label>
+                    <select class="custom3" name="status" onchange="document.getElementById('filterForm').submit()">
+                        <option value="">All</option>
+                        <option value="Pending" <?= $status_filter === 'Pending' ? 'selected' : '' ?>>Pending</option>
+                        <option value="Approved" <?= $status_filter === 'Approved' ? 'selected' : '' ?>>Approved</option>
+                        <option value="Declined" <?= $status_filter === 'Declined' ? 'selected' : '' ?>>Declined</option>
+                    </select>
+                </div>
 
-    <div class="flex3">
- 
-    <form class="resform"method="GET" action="Request.php" id="filterForm" >
+                <div>
+                    <label>Type:</label>
+                    <select class="custom5" name="type" onchange="document.getElementById('filterForm').submit()">
+                        <option value="All" <?= $type_filter === 'All' || !$type_filter ? 'selected' : '' ?>>All</option>
+                        <option value="Barangay Clearance" <?= $type_filter === 'Barangay Clearance' ? 'selected' : '' ?>>Barangay Clearance</option>
+                        <option value="Barangay Indigency" <?= $type_filter === 'Barangay Indigency' ? 'selected' : '' ?>>Barangay Indigency</option>
+                        <option value="Barangay ID" <?= $type_filter === 'Barangay ID' ? 'selected' : '' ?>>Barangay ID</option>
+                        <option value="First Time Job Seeker" <?= $type_filter === 'First Time Job Seeker' ? 'selected' : '' ?>>First Time Job Seeker</option>
+                    </select>
+                </div>
 
-        <div>
-      <label>Status:</label>
-      <select class="custom3" name="status" onchange="document.getElementById('filterForm').submit()">
-        <option value="">All</option>
-        <option value="Pending" <?= $status_filter === 'Pending' ? 'selected' : '' ?>>Pending</option>
-        <option value="Approved" <?= $status_filter === 'Approved' ? 'selected' : '' ?>>Approved</option>
-        <option value="Declined" <?= $status_filter === 'Declined' ? 'selected' : '' ?>>Declined</option>
-      </select>
-  </div>
+                <div>
+                    <label class="day">Day:</label>
+                    <select class="custom4" name="day" id="requestDayFilter" onchange="filterByRequestDay(this.value)">
+                        <option value="" <?= $day_filter === '' ? 'selected' : '' ?>>Select</option>
+                        <option value="7" <?= $day_filter === '7' ? 'selected' : '' ?>>Last 7 Days</option>
+                        <option value="30" <?= $day_filter === '30' ? 'selected' : '' ?>>Last 30 Days</option>
+                        <option value="365" <?= $day_filter === '365' ? 'selected' : '' ?>>Last Year</option>
+                        <option value="custom" <?= $day_filter === 'custom' ? 'selected' : '' ?>>Custom</option>
+                    </select>
 
-    <div>
-        <label>Type:</label>
-        <select class="custom5" name="type" onchange="document.getElementById('filterForm').submit()">
-          <option value="All" <?= $type_filter === 'All' || !$type_filter ? 'selected' : '' ?>>All</option>
-          <option value="Barangay Clearance" <?= $type_filter === 'Barangay Clearance' ? 'selected' : '' ?>>Barangay Clearance</option>
-          <option value="Barangay Indigency" <?= $type_filter === 'Barangay Indigency' ? 'selected' : '' ?>>Barangay Indigency</option>
-          <option value="Barangay ID" <?= $type_filter === 'Barangay ID' ? 'selected' : '' ?>>Barangay ID</option>
-          <option value="First Time Job Seeker" <?= $type_filter === 'First Time Job Seeker' ? 'selected' : '' ?>>First Time Job Seeker</option>
-        </select>
+                    <label id="reqfr" style="display:none;">From:</label>
+                    <input type="date" id="requestFrom" name="from" value="<?= htmlspecialchars($date_from) ?>" style="display:none;" onchange="applyRequestCustomDateFilter()">
+
+                    <label id="reqtoo" style="display:none;">To:</label>
+                    <input class="input1" type="date" id="requestTo" name="to" value="<?= htmlspecialchars($date_to) ?>" style="display:none;" onchange="applyRequestCustomDateFilter()">
+                </div>
+            </form>
+        </div>
+
+        <form method="GET" action="Request.php" id="searchForm">
+            <input
+                class="searches"
+                placeholder="Search"
+                type="search"
+                name="search"
+                value="<?= htmlspecialchars($search) ?>"
+                onchange="document.getElementById('searchForm').submit()">
+        </form>
     </div>
 
+    <?php
+    if (in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
 
-      <div>
-        <label class="day">Day:</label>
-        <select class="custom4" name="day" id="requestDayFilter" onchange="filterByRequestDay(this.value)">
-          <option value="" <?= $day_filter === '' ? 'selected' : '' ?>>Select</option>
-          <option value="7" <?= $day_filter === '7' ? 'selected' : '' ?>>Last 7 Days</option>
-          <option value="30" <?= $day_filter === '30' ? 'selected' : '' ?>>Last 30 Days</option>
-          <option value="365" <?= $day_filter === '365' ? 'selected' : '' ?>>Last Year</option>
-          <option value="custom" <?= $day_filter === 'custom' ? 'selected' : '' ?>>Custom</option>
-        </select>
+        $sql = "SELECT 
+                    r.request_id,
+                    r.document_type,
+                    r.status,
+                    r.date_requested,
+                    r.purpose,
+                    r.guardian_name,
+                    r.guardian_address,
+                    r.guardian_contact,
+                    a.fullname,
+                    a.address,
+                    a.id AS resident_id
+                FROM requests r
+                INNER JOIN accounts a ON r.user_id = a.id
+                WHERE 1=1";
 
-        <label id="reqfr" style="display:none;">From:</label>
-        <input type="date" id="requestFrom" name="from" value="<?= htmlspecialchars($date_from) ?>" style="display:none;" onchange="applyRequestCustomDateFilter()">
+        $params = [];
+        $types = '';
 
-        <label id="reqtoo" style="display:none;">To:</label>
-        <input class="input1" type="date" id="requestTo" name="to" value="<?= htmlspecialchars($date_to) ?>" style="display:none;" onchange="applyRequestCustomDateFilter()">
-      </div>
-</form>
-</div>
-   
-       <form method="GET" action="Request.php" id="filterForm" >
+        if ($status_filter) {
+            $sql .= " AND r.status = ?";
+            $params[] = $status_filter;
+            $types .= 's';
+        }
 
-      <input
-         class="searches"placeholder="Search"
-        type="search"
-        name="search"
-        value="<?= htmlspecialchars($search) ?>"
-        onchange="document.getElementById('filterForm').submit()">
-     </form>
+        if ($type_filter && $type_filter !== 'All') {
+            $sql .= " AND r.document_type = ?";
+            $params[] = $type_filter;
+            $types .= 's';
+        }
 
-</div>
+        if ($day_filter === '7') {
+            $sql .= " AND DATE(r.date_requested) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+        } elseif ($day_filter === '30') {
+            $sql .= " AND DATE(r.date_requested) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
+        } elseif ($day_filter === '365') {
+            $sql .= " AND DATE(r.date_requested) >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)";
+        } elseif ($day_filter === 'custom' && $date_from && $date_to) {
+            $sql .= " AND DATE(r.date_requested) BETWEEN ? AND ?";
+            $params[] = $date_from;
+            $params[] = $date_to;
+            $types .= 'ss';
+        } elseif ($date_from && $date_to) {
+            $sql .= " AND DATE(r.date_requested) BETWEEN ? AND ?";
+            $params[] = $date_from;
+            $params[] = $date_to;
+            $types .= 'ss';
+        }
 
-  <!-- REQUEST TABLE -->
-  <?php
-  if ($_SESSION['role'] === 'Admin') {
+        if ($search) {
+            $sql .= " AND (a.fullname LIKE ? OR r.document_type LIKE ? OR r.purpose LIKE ?)";
+            $search_term = "%$search%";
+            $params[] = $search_term;
+            $params[] = $search_term;
+            $params[] = $search_term;
+            $types .= 'sss';
+        }
 
-      $sql = "SELECT 
-                  r.request_id,
-                  r.document_type,
-                  r.status,
-                  r.date_requested,
-                  r.purpose,
-                  r.guardian_name,
-                  r.guardian_address,
-                  r.guardian_contact,
-                  a.fullname,
-                  a.address,
-                  a.id AS resident_id
-              FROM requests r
-              INNER JOIN accounts a ON r.user_id = a.id
-              WHERE 1=1";
+        $sql .= " ORDER BY r.date_requested DESC";
 
-      $params = [];
-      $types = '';
+        $stmt = $conn->prepare($sql);
+        if ($params) {
+            $stmt->bind_param($types, ...$params);
+        }
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-      if ($status_filter) {
-          $sql .= " AND r.status = ?";
-          $params[] = $status_filter;
-          $types .= 's';
-      }
+        $requestRows = [];
+        while ($result && $row = $result->fetch_assoc()) {
+            $requestRows[] = $row;
+        }
 
-      if ($type_filter && $type_filter !== 'All') {
-          $sql .= " AND r.document_type = ?";
-          $params[] = $type_filter;
-          $types .= 's';
-      }
+        echo "<div class='table-container'>";
+        echo "<table border='1' cellpadding='10'>";
 
-      if ($day_filter === '7') {
-          $sql .= " AND DATE(r.date_requested) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
-      } elseif ($day_filter === '30') {
-          $sql .= " AND DATE(r.date_requested) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
-      } elseif ($day_filter === '365') {
-          $sql .= " AND DATE(r.date_requested) >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)";
-      } elseif ($day_filter === 'custom' && $date_from && $date_to) {
-          $sql .= " AND DATE(r.date_requested) BETWEEN ? AND ?";
-          $params[] = $date_from;
-          $params[] = $date_to;
-          $types .= 'ss';
-      } elseif ($date_from && $date_to) {
-          $sql .= " AND DATE(r.date_requested) BETWEEN ? AND ?";
-          $params[] = $date_from;
-          $params[] = $date_to;
-          $types .= 'ss';
-      }
+        echo "
+            <tr>
+                <th>Resident Name / ID</th>
+                <th>Requested Document</th>
+                <th>Date Requested</th>
+                <th>Request Status</th>
+                <th>Actions</th>
+            </tr>
+        ";
 
-      if ($search) {
-          $sql .= " AND (a.fullname LIKE ? OR r.document_type LIKE ? OR r.purpose LIKE ?)";
-          $search_term = "%$search%";
-          $params[] = $search_term;
-          $params[] = $search_term;
-          $params[] = $search_term;
-          $types .= 'sss';
-      }
+        if (!empty($requestRows)) {
+            foreach ($requestRows as $row) {
+                echo "<tr>";
+                echo "<td>" . htmlspecialchars($row['fullname']) . " (RES-" . str_pad($row['resident_id'], 3, '0', STR_PAD_LEFT) . ")</td>";
+                echo "<td>" . htmlspecialchars($row['document_type']) . "</td>";
+                echo "<td>" . htmlspecialchars($row['date_requested']) . "</td>";
+                echo "<td>" . htmlspecialchars(ucfirst($row['status'])) . "</td>";
+                echo "<td>
+                    <button class='btn-view' onclick='viewRequest(" . (int)$row['request_id'] . ")'>View</button>
+                    <button class='btn-approve' onclick='openApprovalModal(" . (int)$row['request_id'] . ")'>Approve</button>
+                    <button class='btn-decline' onclick='openDeclineModal(" . (int)$row['request_id'] . ")'>Decline</button>
+                  </td>";
+                echo "</tr>";
+            }
+        } else {
+            echo "<tr><td colspan='5'>No requests found</td></tr>";
+        }
 
-      $sql .= " ORDER BY r.date_requested DESC";
+        echo "</table>";
+        echo "</div>";
 
-      $stmt = $conn->prepare($sql);
-      if ($params) {
-          $stmt->bind_param($types, ...$params);
-      }
-      $stmt->execute();
-      $result = $stmt->get_result();
+        echo "<div style='display: flex;'>";
+        echo "  <div class='botbtn'>";
+        echo "  <button class='btn-report' onclick='generateReport()'>Generate Report</button>";
+        echo "  </div>";
+        echo "</div>";
 
-      echo "<div class='table-container'>";
-      echo "<table border='1' cellpadding='10'>";
+        foreach ($requestRows as $row) {
 
-      echo "
-          <tr>
-              <th>Resident Name / ID</th>
-              <th>Requested Document</th>
-              <th>Date Requested</th>
-              <th>Request Status</th>
-              <th>Actions</th>
-          </tr>
-      ";
+            echo "
+            <div id='modal-{$row['request_id']}' class='modal'>
+                <div class='modal-content'>
+                    <span class='close' onclick='closeModal({$row['request_id']})'>&times;</span>
+                    <h2 style='margin-top:0px; margin-bottom:10px;'>Request Details</h2>
+                    <hr style='width:100%;'>
+                    <p><strong>Resident Full Name:</strong> " . htmlspecialchars($row['fullname']) . "</p>
+                    <p><strong>Resident Address:</strong> " . htmlspecialchars($row['address']) . "</p>
+                    <p><strong>Purpose:</strong> " . htmlspecialchars($row['purpose']) . "</p>
+                    <p><strong>Requested Document:</strong> " . htmlspecialchars($row['document_type']) . "</p>";
 
-      if ($result && $result->num_rows > 0) {
-          while ($row = $result->fetch_assoc()) {
-              echo "<tr>";
-              echo "<td>" . htmlspecialchars($row['fullname']) . " (RES-" . str_pad($row['resident_id'], 3, '0', STR_PAD_LEFT) . ")</td>";
-              echo "<td>" . htmlspecialchars($row['document_type']) . "</td>";
-              echo "<td>" . htmlspecialchars($row['date_requested']) . "</td>";
-              echo "<td>" . htmlspecialchars(ucfirst($row['status'])) . "</td>";
-              echo "<td>
-                  <button class='btn-view' onclick='viewRequest(" . (int)$row['request_id'] . ")'>View</button>
-                  <button class='btn-approve' onclick='openApprovalModal(" . (int)$row['request_id'] . ")'>Approve</button>
-                  <button class='btn-decline' onclick='openDeclineModal(" . (int)$row['request_id'] . ")'>Decline</button>
-                </td>";
-              echo "</tr>";
-          }
-      } else {
-          echo "<tr><td colspan='5'>No requests found</td></tr>";
-      }
+            if (!empty($row['guardian_name'])) {
+                echo "<p><strong>Guardian Name:</strong> " . htmlspecialchars($row['guardian_name']) . "</p>";
+                echo "<p><strong>Guardian Address:</strong> " . htmlspecialchars($row['guardian_address']) . "</p>";
+                echo "<p><strong>Guardian Contact:</strong> " . htmlspecialchars($row['guardian_contact']) . "</p>";
+            }
 
-      echo "</table>";
-      echo "</div>";
+            echo "
+                </div>
+            </div>";
 
-      echo "<div style='display: flex;'>";
-      echo "  <div class='botbtn'>";
-      echo "  <button class='btn-report' onclick='generateReport()'>Generate Report</button>";
-      echo "  </div>";
-      echo "</div>";
+            echo "
+            <div id='approveModal-{$row['request_id']}' class='modal'>
+                <div class='modal-content' style='max-width: 400px;'>
+                    <span class='close' onclick='closeApprovalModal({$row['request_id']})'>&times;</span>
+                    <h2>Approve Request</h2>
+                    <p>Are you sure you want to approve this request?</p>
+                    <p><strong>Resident:</strong> " . htmlspecialchars($row['fullname']) . "</p>
+                    <p><strong>Document:</strong> " . htmlspecialchars($row['document_type']) . "</p>
+                    <div style='display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;'>
+                        <button type='button' class='btn-decline' onclick='closeApprovalModal({$row['request_id']})'>Cancel</button>
+                        <button type='button' class='btn-approve' onclick='submitApprovalForm({$row['request_id']})'>Confirm Approve</button>
+                    </div>
+                </div>
+            </div>
 
-      // Modals for each request
-      if ($result) {
-          $result->data_seek(0);
-          while ($row = $result->fetch_assoc()) {
+            <form id='approveForm-{$row['request_id']}' method='POST' style='display:none;'>
+                <input type='hidden' name='request_id' value='" . (int)$row['request_id'] . "'>
+                <input type='hidden' name='approve' value='1'>
+            </form>";
 
-              echo "
-              <div id='modal-{$row['request_id']}' class='modal'>
-                  <div class='modal-content'>
-                      <span class='close' onclick='closeModal({$row['request_id']})'>&times;</span>
-                      <h2 style='margin-top:0px; margin-bottom:10px;'>Request Details</h2>
-                       <hr style='width:100%;'>
-                      <p><strong>Resident Full Name:</strong> " . htmlspecialchars($row['fullname']) . "</p>
-                      <p><strong>Resident Address:</strong> " . htmlspecialchars($row['address']) . "</p>
-                      <p><strong>Purpose:</strong> " . htmlspecialchars($row['purpose']) . "</p>
-                      <p><strong>Requested Document:</strong> " . htmlspecialchars($row['document_type']) . "</p>";
+            echo "
+            <div id='declineModal-{$row['request_id']}' class='modal'>
+                <div class='modal-content' style='max-width: 450px;'>
+                    <span class='close' onclick='closeDeclineModal({$row['request_id']})'>&times;</span>
+                    <h2>Decline Request</h2>
+                    <p>Are you sure you want to decline this request?</p>
+                    <p><strong>Resident:</strong> " . htmlspecialchars($row['fullname']) . "</p>
+                    <p><strong>Document:</strong> " . htmlspecialchars($row['document_type']) . "</p>
 
-              if (!empty($row['guardian_name'])) {
-                  echo "<p><strong>Guardian Name:</strong> " . htmlspecialchars($row['guardian_name']) . "</p>";
-                  echo "<p><strong>Guardian Address:</strong> " . htmlspecialchars($row['guardian_address']) . "</p>";
-                  echo "<p><strong>Guardian Contact:</strong> " . htmlspecialchars($row['guardian_contact']) . "</p>";
-              }
+                    <label style='display:block; font-weight:700; margin-top:15px; margin-bottom:8px;'>Reason for Decline:</label>
+                    <textarea id='declineReason-{$row['request_id']}' style='width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; font-family:inherit; resize:vertical; min-height:80px;' placeholder='Provide a reason for declining this request...'></textarea>
 
-              echo "
-                  </div>
-              </div>";
+                    <div style='display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;'>
+                        <button type='button' class='btn-approve' onclick='closeDeclineModal({$row['request_id']})'>Cancel</button>
+                        <button type='button' class='btn-decline' onclick='submitDeclineForm({$row['request_id']})'>Confirm Decline</button>
+                    </div>
+                </div>
+            </div>
 
-              echo "
-              <div id='approveModal-{$row['request_id']}' class='modal'>
-                  <div class='modal-content' style='max-width: 400px;'>
-                      <span class='close' onclick='closeApprovalModal({$row['request_id']})'>&times;</span>
-                      <h2>Approve Request</h2>
-                      <p>Are you sure you want to approve this request?</p>
-                      <p><strong>Resident:</strong> " . htmlspecialchars($row['fullname']) . "</p>
-                      <p><strong>Document:</strong> " . htmlspecialchars($row['document_type']) . "</p>
-                      <div style='display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;'>
-                          <button class='btn-decline' onclick='closeApprovalModal({$row['request_id']})'>Cancel</button>
-                          <button class='btn-approve' onclick='submitApprovalForm({$row['request_id']})'>Confirm Approve</button>
-                      </div>
-                  </div>
-              </div>
+            <form id='declineForm-{$row['request_id']}' method='POST' style='display:none;'>
+                <input type='hidden' name='request_id' value='" . (int)$row['request_id'] . "'>
+                <input type='hidden' name='decline' value='1'>
+                <input type='hidden' id='declineReasonInput-{$row['request_id']}' name='decline_reason' value=''>
+            </form>";
+        }
+    }
 
-              <form id='approveForm-{$row['request_id']}' method='POST' style='display:none;'>
-                  <input type='hidden' name='request_id' value='" . (int)$row['request_id'] . "'>
-                  <input type='hidden' name='approve' value='1'>
-              </form>";
+    if ($_SESSION['role'] === 'resident') {
+        $user_id = $_SESSION['user_id'];
+        $sql = "SELECT request_id, document_type, status, date_requested FROM requests WHERE user_id = ? ORDER BY date_requested DESC";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-              echo "
-              <div id='declineModal-{$row['request_id']}' class='modal'>
-                  <div class='modal-content' style='max-width: 450px;'>
-                      <span class='close' onclick='closeDeclineModal({$row['request_id']})'>&times;</span>
-                      <h2>Decline Request</h2>
-                      <p>Are you sure you want to decline this request?</p>
-                      <p><strong>Resident:</strong> " . htmlspecialchars($row['fullname']) . "</p>
-                      <p><strong>Document:</strong> " . htmlspecialchars($row['document_type']) . "</p>
+        echo "<div class='table-container'>";
+        echo "<h2>My Document Requests</h2>";
+        echo "<table border='1' cellpadding='10'>";
+        echo "<tr><th>Request ID</th><th>Document</th><th>Status</th><th>Date Requested</th></tr>";
 
-                      <label style='display:block; font-weight:700; margin-top:15px; margin-bottom:8px;'>Reason for Decline:</label>
-                      <textarea id='declineReason-{$row['request_id']}' style='width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; font-family:inherit; resize:vertical; min-height:80px;' placeholder='Provide a reason for declining this request...'></textarea>
-
-                      <div style='display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;'>
-                          <button class='btn-approve' onclick='closeDeclineModal({$row['request_id']})'>Cancel</button>
-                          <button class='btn-decline' onclick='submitDeclineForm({$row['request_id']})'>Confirm Decline</button>
-                      </div>
-                  </div>
-              </div>
-
-              <form id='declineForm-{$row['request_id']}' method='POST' style='display:none;'>
-                  <input type='hidden' name='request_id' value='" . (int)$row['request_id'] . "'>
-                  <input type='hidden' name='decline' value='1'>
-                  <input type='hidden' id='declineReasonInput-{$row['request_id']}' name='decline_reason' value=''>
-              </form>";
-          }
-      }
-  }
-
-  // Resident view
-  if ($_SESSION['role'] === 'resident') {
-      $user_id = $_SESSION['user_id'];
-      $sql = "SELECT request_id, document_type, status, date_requested FROM requests WHERE user_id = ? ORDER BY date_requested DESC";
-      $stmt = $conn->prepare($sql);
-      $stmt->bind_param("i", $user_id);
-      $stmt->execute();
-      $result = $stmt->get_result();
-
-      echo "<div class='table-container'>";
-      echo "<h2>My Document Requests</h2>";
-      echo "<table border='1' cellpadding='10'>";
-      echo "<tr><th>Request ID</th><th>Document</th><th>Status</th><th>Date Requested</th></tr>";
-
-      if ($result && $result->num_rows > 0) {
-          while ($row = $result->fetch_assoc()) {
-              echo "<tr>";
-              echo "<td>REQ-" . str_pad($row['request_id'], 3, '0', STR_PAD_LEFT) . "</td>";
-              echo "<td>" . htmlspecialchars($row['document_type']) . "</td>";
-              echo "<td>" . htmlspecialchars(ucfirst($row['status'])) . "</td>";
-              echo "<td>" . htmlspecialchars($row['date_requested']) . "</td>";
-              echo "</tr>";
-          }
-      } else {
-          echo "<tr><td colspan='4'>No requests submitted yet</td></tr>";
-      }
-      echo "</table>";
-      echo "</div>";
-  }
-  ?>
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                echo "<tr>";
+                echo "<td>REQ-" . str_pad($row['request_id'], 3, '0', STR_PAD_LEFT) . "</td>";
+                echo "<td>" . htmlspecialchars($row['document_type']) . "</td>";
+                echo "<td>" . htmlspecialchars(ucfirst($row['status'])) . "</td>";
+                echo "<td>" . htmlspecialchars($row['date_requested']) . "</td>";
+                echo "</tr>";
+            }
+        } else {
+            echo "<tr><td colspan='4'>No requests submitted yet</td></tr>";
+        }
+        echo "</table>";
+        echo "</div>";
+    }
+    ?>
 </div>
 
 <style>
@@ -1136,7 +1156,6 @@ function closeNotificationModal() {
   document.getElementById('notificationModal').style.display = 'none';
 }
 
-// close modal when clicking outside (same pattern)
 window.addEventListener('click', function(e){
   const notifModal = document.getElementById('notificationModal');
   if (e.target === notifModal) notifModal.style.display = 'none';
@@ -1246,7 +1265,6 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-// Close any modal when clicking outside
 window.onclick = function(event) {
   if (event.target.className === 'modal') {
     event.target.style.display = 'none';

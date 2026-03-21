@@ -1,18 +1,11 @@
 <?php
-/* ============================
-   FEEDBACK.PHP (UPDATED NOTIFICATIONS LIKE ADMIN DASHBOARD)
-   - Adds FollowUp notifications (hidden if sender email is active)
-   - Adds Notification Details Modal (same as Admin Dashboard)
-   - Keeps your existing design and feedback features
-   ============================ */
-
 session_start();
-include "db.php";
-
-if (!isset($_SESSION["user_id"])) {
+if (!isset($_SESSION["role"]) || !in_array($_SESSION["role"], ["Admin", "SuperAdmin"])) {
     header("Location: login.php");
     exit;
 }
+
+include "db.php";
 
 /* ==========================
    NOTIFICATIONS (COMBINED) + FOLLOWUP (LIKE ADMIN DASHBOARD)
@@ -142,7 +135,7 @@ $recentNotifications = array_slice($recentNotifications, 0, 10); // Limit 10
 
 
 // Add role-based access check
-if (!isset($_SESSION["role"]) || $_SESSION["role"] !== 'Admin') {
+if (!isset($_SESSION["role"]) || !in_array($_SESSION["role"], ['Admin', 'SuperAdmin'])) {
     header("Location: login.php");
     exit;
 }
@@ -172,7 +165,7 @@ if (isset($_POST['action']) && isset($_POST['feedback_id'])) {
 /* ==========================
    PRINTABLE PDF EXPORT
    ========================== */
-if (isset($_GET['export']) && $_GET['export'] === 'pdf' && $_SESSION['role'] === 'Admin') {
+if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['role'], ['Admin', 'SuperAdmin'])) {
 
     $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
     $day_filter = isset($_GET['day']) ? $_GET['day'] : '';
@@ -529,10 +522,17 @@ $stmt->close();
 
   <hr class="hrside">
 
-  <div class="btncontainer" onclick="window.location.href='Admin_Dashboard.php'">
-    <img class="icon" src="images/dashboard.png" alt="home" />
+  <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+  <div class="btncontainer" onclick="window.location.href='SuperAdmin_Dashboard.php'">
+    <img class="icon" src="images/dashboard.png" alt="home" /> 
     <h4 class="text">Dashboard</h4>
   </div>
+<?php elseif ($_SESSION["role"] === "Admin"): ?>
+  <div class="btncontainer" onclick="window.location.href='Admin_Dashboard.php'">
+    <img class="icon" src="images/dashboard.png" alt="home" /> 
+    <h4 class="text">Dashboard</h4>
+  </div>
+<?php endif; ?>
 
   <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
     <img class="icon" src="images/add-user.png" alt="home" />
@@ -558,6 +558,12 @@ $stmt->close();
     <img class="icon" src="images/fbicon.png" alt="request" />
     <h4 class="text">Feedback</h4>
   </div>
+  <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
+<div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+    <img class="icon" src="images/add-user.png" alt="manage accounts" />
+    <h4 class="text">Manage Accounts</h4>
+</div>
+<?php endif; ?>
     <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
 
     <div class="address1" >

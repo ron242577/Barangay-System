@@ -67,7 +67,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['reset_password'])) {
                 $log->close();
 
                 // Role-based redirect
-                if ($user["role"] === "Admin") {
+                if ($user["role"] === "SuperAdmin") {
+                    header("Location: SuperAdmin_Dashboard.php");
+                } elseif ($user["role"] === "Admin") {
                     header("Location: Admin_Dashboard.php");
                 } else {
                     header("Location: homepage.php");
