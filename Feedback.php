@@ -291,7 +291,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['r
                     <th>Resident Name</th>
                     <th>Status</th>
                     <th>Feedback</th>
-                    <th>Date</th>
+                    <th>Date Submitted</th>
                 </tr>
                 <?php if (empty($rows)): ?>
                     <tr><td colspan="6">No feedbacks found.</td></tr>
@@ -303,7 +303,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['r
                             <td><?= htmlspecialchars($f['resident_name']) ?></td>
                             <td><?= htmlspecialchars($f['status']) ?></td>
                             <td><?= htmlspecialchars($f['feedback_text']) ?></td>
-                            <td><?= htmlspecialchars($f['created_at']) ?></td>
+                            <td><?= date('m-d-Y h:i A', strtotime($f['created_at'])) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -696,6 +696,7 @@ $stmt->close();
   <th>Request ID</th>
   <th>Resident ID</th>
   <th>Resident Name</th>
+  <th>Date Submitted</th>
   <th>Actions</th>
 </tr>
 <?php if (empty($feedbacks)): ?>
@@ -706,6 +707,7 @@ $stmt->close();
   <td>FB-<?= str_pad($feedback['id'], 3, '0', STR_PAD_LEFT) ?></td>
   <td>RES-<?= str_pad($feedback['resident_id'], 3, '0', STR_PAD_LEFT) ?></td>
   <td><?= htmlspecialchars($feedback['resident_name']) ?></td>
+  <td><?= date('m-d-Y h:i A', strtotime($feedback['created_at'])) ?></td>
   <td style="text-align:center;">
     <button class="btn-view" onclick="viewFeedback(<?= htmlspecialchars(json_encode($feedback)) ?>)">View</button>
   </td>

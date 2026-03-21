@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 19, 2026 at 04:50 AM
+-- Generation Time: Mar 21, 2026 at 01:28 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -62,7 +62,7 @@ INSERT INTO `accounts` (`id`, `fullname`, `birthdate`, `gender`, `civil_status`,
 (2, 'Katsu Rodriguez Perlas', '2026-01-20', 'male', 'single', 'sadad', '09991234567', 'katsu@gmail.com', 'Katsu', '$2y$10$60QEmS54HBsysZWmQJP0keOvrBtn3Qzqbo2QRtVQsgxKAHOlS.Eyq', 'no', 'Arron', 'no', 'no', NULL, NULL, 'resident', 'active', '2026-01-19 16:34:27', 'uploads/profiles/profile_2_1771397420.png', NULL, 0, NULL),
 (3, 'Marcus Dominique  Muico', '2004-12-26', 'male', 'single', 'Blk.15 Lot 1 D Matuklasan, Kung Saan-Saan na Napadpad St. Naligaw City', '09121231234', 'marcusmuico70@gmail.com', 'makimaki', '$2y$10$muAO1bzwEc62O7mLLZ4AIOkKhaR.r06qhLbE5alf5k5MhzgESfeVG', 'no', 'n/a', 'no', 'no', NULL, NULL, 'resident', 'active', '2026-01-22 10:15:44', 'uploads/profiles/profile_3_1771243356.png', NULL, 0, NULL),
 (7, 'Marcus admin', '2004-12-26', 'male', 'single', 'Blk.15 Lot 1 D Matuklasan, Kung Saan-Saan na Napadpad St. Naligaw City', '09121231234', 'makimuico@gmail.com', 'Maki admin', '$2y$10$3T5fy4VOfPHS5X/6wC/TyO5gd6gO6oRyHX144jqo3/QEOZytKsuEO', 'no', 'n/a', 'no', 'no', NULL, NULL, 'Admin', 'active', '2026-01-22 10:15:44', NULL, NULL, 0, NULL),
-(8, 'maki maki muico', '2020-02-12', 'male', 'single', 'asdddddd', '09121231235', 'maki@gmail.com', 'makimakimaki', '$2y$10$1X2ogfG/ekRxtVpIyG72kOeca9vBmy5LWHocmOtlox12UnA8YWhve', 'yes', 'mama ko', 'yes', 'yes', 'uploads/ids/pwd_1771243652.pdf', 'uploads/ids/solo_1771243652.png', 'admin', 'active', '2026-02-16 12:07:32', 'uploads/profiles/profile_8_1771244355.png', NULL, 0, NULL),
+(8, 'maki maki muico', '2020-02-12', 'male', 'single', 'asdddddd', '09121231235', 'maki@gmail.com', 'makimakimaki', '$2y$10$1X2ogfG/ekRxtVpIyG72kOeca9vBmy5LWHocmOtlox12UnA8YWhve', 'yes', 'mama ko', 'yes', 'yes', 'uploads/ids/pwd_1771243652.pdf', 'uploads/ids/solo_1771243652.png', 'SuperAdmin', 'active', '2026-02-16 12:07:32', 'uploads/profiles/profile_8_1771244355.png', NULL, 0, NULL),
 (9, 'Arron R. Perlas', '2026-02-19', 'male', 'single', 'secret', '09995668071', 'pikachu2477@gmail.com', 'Pika', '$2y$10$DIhFb.Df./6dt6PKmaBvmOk9w3Uu7nlVvvymgKpHEPf11wJHcXnsO', 'no', 'pikachu', 'yes', 'yes', 'uploads/ids/pwd_1772243174.jpg', 'uploads/ids/solo_1772243174.jpg', 'resident', 'active', '2026-02-28 01:46:14', NULL, NULL, 0, 'uploads/ids/residency_1772243174.png'),
 (10, 'wefASDFASD FASDFASDF ASDFASDF', '2026-03-04', 'female', 'single', 'ASDASDASDA', '09996785642', 'ASDD@GMAUL.COM', 'ASDASDASD', '$2y$10$oFaMKaHS77xBwf7ZsXcRsOdaEJzN1JmkJf33.fFAwHLWkLe2sW3f.', 'no', 'DASDAS', 'no', 'no', NULL, NULL, 'resident', 'declined', '2026-03-02 13:03:06', NULL, NULL, 0, 'uploads/ids/residency_1772456586.jpg'),
 (11, 'asdasdasda dasdasdas dasdasd', '2026-04-01', 'male', 'married', 'adsasdasdsada', '09998765467', 'asdasd@gmail.com', 'asda', '$2y$10$yCiwg0fx2LqATxRdulnXGOLn59fO4XrGp7HIMBdZ42ud.Xrb/LQkW', 'no', 'asdasd', 'no', 'no', NULL, NULL, 'resident', 'pending', '2026-03-02 13:20:10', NULL, NULL, 0, 'uploads/ids/residency_1772457610.jpg'),
@@ -93,7 +93,8 @@ INSERT INTO `admin_followups` (`id`, `sender_email`, `message`, `status`, `creat
 (2, 'maki@gmail.com', 'pafollow up po', 'Read', '2026-03-05 17:15:01'),
 (3, 'ron@gmail.com', 'sddasad', 'New', '2026-03-05 17:51:08'),
 (4, 'rron@gmail.com', 'paaccept pls', 'New', '2026-03-05 17:55:46'),
-(5, 'pikachu2477@gmail.com', 'plss acpt my account', 'Read', '2026-03-18 10:49:19');
+(5, 'pikachu2477@gmail.com', 'plss acpt my account', 'Read', '2026-03-18 10:49:19'),
+(6, 'marcusmuico70@gmail.com', 'daadas', 'New', '2026-03-21 05:50:43');
 
 -- --------------------------------------------------------
 
@@ -435,7 +436,49 @@ INSERT INTO `login_logs` (`id`, `user_id`, `email`, `ip_address`, `login_time`) 
 (250, 1, 'arronperlas2017@gmail.com', '::1', '2026-03-18 18:15:54'),
 (253, 1, 'arronperlas2017@gmail.com', '::1', '2026-03-18 18:19:05'),
 (255, 1, 'arronperlas2017@gmail.com', '::1', '2026-03-18 18:29:26'),
-(257, 1, 'arronperlas2017@gmail.com', '::1', '2026-03-18 18:30:46');
+(257, 1, 'arronperlas2017@gmail.com', '::1', '2026-03-18 18:30:46'),
+(259, 7, 'makimuico@gmail.com', '::1', '2026-03-21 03:21:16'),
+(260, 8, 'maki@gmail.com', '::1', '2026-03-21 03:44:16'),
+(261, 7, 'makimuico@gmail.com', '::1', '2026-03-21 03:44:59'),
+(262, 8, 'maki@gmail.com', '::1', '2026-03-21 03:45:14'),
+(263, 8, 'maki@gmail.com', '::1', '2026-03-21 03:45:22'),
+(264, 8, 'maki@gmail.com', '::1', '2026-03-21 03:46:40'),
+(265, 7, 'makimuico@gmail.com', '::1', '2026-03-21 03:47:16'),
+(266, 7, 'makimuico@gmail.com', '::1', '2026-03-21 03:48:32'),
+(267, 7, 'makimuico@gmail.com', '::1', '2026-03-21 03:49:28'),
+(268, 8, 'maki@gmail.com', '::1', '2026-03-21 03:49:42'),
+(269, 7, 'makimuico@gmail.com', '::1', '2026-03-21 03:55:20'),
+(270, 8, 'maki@gmail.com', '::1', '2026-03-21 03:55:42'),
+(271, 7, 'makimuico@gmail.com', '::1', '2026-03-21 04:09:02'),
+(272, 8, 'maki@gmail.com', '::1', '2026-03-21 04:09:37'),
+(273, 8, 'maki@gmail.com', '::1', '2026-03-21 04:12:56'),
+(274, 8, 'maki@gmail.com', '::1', '2026-03-21 04:13:35'),
+(275, 8, 'maki@gmail.com', '::1', '2026-03-21 04:17:21'),
+(276, 7, 'makimuico@gmail.com', '::1', '2026-03-21 04:26:13'),
+(277, 8, 'maki@gmail.com', '::1', '2026-03-21 04:26:22'),
+(278, 3, 'marcusmuico70@gmail.com', '::1', '2026-03-21 04:30:40'),
+(279, 7, 'makimuico@gmail.com', '::1', '2026-03-21 04:31:00'),
+(280, 8, 'maki@gmail.com', '::1', '2026-03-21 04:42:26'),
+(281, 7, 'makimuico@gmail.com', '::1', '2026-03-21 04:52:13'),
+(282, 8, 'maki@gmail.com', '::1', '2026-03-21 04:52:26'),
+(283, 7, 'makimuico@gmail.com', '::1', '2026-03-21 04:54:20'),
+(284, 17, 'pikachu242577@gmail.com', '::1', '2026-03-21 04:56:13'),
+(285, 8, 'maki@gmail.com', '::1', '2026-03-21 04:56:50'),
+(286, 7, 'makimuico@gmail.com', '::1', '2026-03-21 04:59:07'),
+(287, 3, 'marcusmuico70@gmail.com', '::1', '2026-03-21 04:59:20'),
+(288, 8, 'maki@gmail.com', '::1', '2026-03-21 05:00:15'),
+(289, 3, 'marcusmuico70@gmail.com', '::1', '2026-03-21 05:15:27'),
+(290, 8, 'maki@gmail.com', '::1', '2026-03-21 05:16:28'),
+(291, 3, 'marcusmuico70@gmail.com', '::1', '2026-03-21 05:17:12'),
+(292, 8, 'maki@gmail.com', '::1', '2026-03-21 05:17:19'),
+(293, 8, 'maki@gmail.com', '::1', '2026-03-21 05:50:11'),
+(294, 8, 'maki@gmail.com', '::1', '2026-03-21 05:50:49'),
+(295, 3, 'marcusmuico70@gmail.com', '::1', '2026-03-21 05:54:45'),
+(296, 8, 'maki@gmail.com', '::1', '2026-03-21 05:54:56'),
+(297, 8, 'maki@gmail.com', '::1', '2026-03-21 06:31:33'),
+(298, 8, 'maki@gmail.com', '::1', '2026-03-21 06:46:24'),
+(299, 3, 'marcusmuico70@gmail.com', '::1', '2026-03-21 06:46:57'),
+(300, 8, 'maki@gmail.com', '::1', '2026-03-21 06:47:05');
 
 -- --------------------------------------------------------
 
@@ -484,21 +527,22 @@ CREATE TABLE `reports` (
   `proof` varchar(255) DEFAULT NULL,
   `specify` text DEFAULT NULL,
   `status` enum('Pending','Resolved','Ongoing','Declined') DEFAULT 'Pending',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `decline_reason` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `reports`
 --
 
-INSERT INTO `reports` (`id`, `user_id`, `reason`, `person_reported`, `address`, `proof`, `specify`, `status`, `created_at`) VALUES
-(1, 7, 'Vandalism', 'dsad', 'asdasda', 'uploads/reports/BARANGAY-292-OFFICIAL-DIRECTORY-2025.xlsx', 'sasddasd', 'Resolved', '2026-01-22 14:03:16'),
-(2, 3, 'Vandalism', 'Tracy Alamo', 'Hulo', 'uploads/reports/barangay-system.sql', 'Drinowingan bakod ko', 'Declined', '2026-01-22 14:09:48'),
-(3, 3, 'Noise Disturbance', 'Arron', 'Don sa kanto', 'uploads/reports/barangay-system.sql', 'Ingay ng speaker', 'Resolved', '2026-01-22 14:25:54'),
-(16, 3, 'Suspicious Activity', 'ddasddddasa', 'ddasddadasdas', 'uploads/reports/1771243896_627686341_1249429603793758_3506346902432469639_n.png', 'adsdddddasdd', 'Declined', '2026-02-16 12:11:36'),
-(17, 2, 'Noise Disturbance', 'my neighbor', 'kahit saan', 'uploads/reports/1772456795_Screenshot 2026-02-27 153347.png', 'lkj HAVDFGYHJKASDfv hlkjasfdlhkas', 'Pending', '2026-03-02 13:06:35'),
-(18, 9, 'Noise Disturbance', 'asd', 'asd', 'uploads/reports/1773831204_Demonyo.jpg', 'asd', 'Pending', '2026-03-18 10:53:24'),
-(19, 9, 'Noise Disturbance', 'asd', 'asd', 'uploads/reports/1773831778_Demonyo.jpg', 'asd', 'Pending', '2026-03-18 11:02:58');
+INSERT INTO `reports` (`id`, `user_id`, `reason`, `person_reported`, `address`, `proof`, `specify`, `status`, `created_at`, `decline_reason`) VALUES
+(1, 7, 'Vandalism', 'dsad', 'asdasda', 'uploads/reports/BARANGAY-292-OFFICIAL-DIRECTORY-2025.xlsx', 'sasddasd', 'Resolved', '2026-01-22 14:03:16', NULL),
+(2, 3, 'Vandalism', 'Tracy Alamo', 'Hulo', 'uploads/reports/barangay-system.sql', 'Drinowingan bakod ko', 'Declined', '2026-01-22 14:09:48', NULL),
+(3, 3, 'Noise Disturbance', 'Arron', 'Don sa kanto', 'uploads/reports/barangay-system.sql', 'Ingay ng speaker', 'Resolved', '2026-01-22 14:25:54', NULL),
+(16, 3, 'Suspicious Activity', 'ddasddddasa', 'ddasddadasdas', 'uploads/reports/1771243896_627686341_1249429603793758_3506346902432469639_n.png', 'adsdddddasdd', 'Declined', '2026-02-16 12:11:36', ''),
+(17, 2, 'Noise Disturbance', 'my neighbor', 'kahit saan', 'uploads/reports/1772456795_Screenshot 2026-02-27 153347.png', 'lkj HAVDFGYHJKASDfv hlkjasfdlhkas', 'Pending', '2026-03-02 13:06:35', NULL),
+(18, 9, 'Noise Disturbance', 'asd', 'asd', 'uploads/reports/1773831204_Demonyo.jpg', 'asd', 'Pending', '2026-03-18 10:53:24', NULL),
+(19, 9, 'Noise Disturbance', 'asd', 'asd', 'uploads/reports/1773831778_Demonyo.jpg', 'asd', 'Resolved', '2026-03-18 11:02:58', NULL);
 
 -- --------------------------------------------------------
 
@@ -530,10 +574,11 @@ INSERT INTO `requests` (`request_id`, `user_id`, `fullname`, `address`, `purpose
 (1, 2, 'asd', 'asda', 'adsad', 'Barangay Indigency', '', '', '', 'Declined', '2026-01-20 11:16:19', '2026-01-20 11:57:18', NULL),
 (3, 1, 'Katsu Rodriguez Perlas', 'asdasda', 'asdasd', 'Barangay Clearance', '', '', '', 'Approved', '2026-01-20 12:16:49', '2026-01-20 12:16:49', NULL),
 (4, 1, 'Patrick garcia', 'asdasd', 'asdasd', 'Barangay ID', '', '', '', 'Approved', '2026-01-20 13:05:38', '2026-01-20 13:05:38', NULL),
-(5, 2, 'Patrick garcia', 'asdasd', 'asdasd', 'First Time Job Seeker', '', '', '', 'Declined', '2026-01-20 13:06:41', '2026-01-20 13:06:41', NULL),
-(21, 8, 'Marcus Dominique  Muico', 'Blk.15 Lot 1 D Matuklasan, Kung Saan-Saan na Napadpad St. Naligaw City', 'Basta kelangan ko ', 'Barangay Clearance', '', '', '', 'Pending', '2026-02-16 23:00:16', '2026-02-16 23:00:16', NULL),
+(5, 2, 'Patrick garcia', 'asdasd', 'asdasd', 'First Time Job Seeker', '', '', '', 'Declined', '2026-01-20 13:06:41', '2026-01-20 13:06:41', ''),
+(21, 8, 'Marcus Dominique  Muico', 'Blk.15 Lot 1 D Matuklasan, Kung Saan-Saan na Napadpad St. Naligaw City', 'Basta kelangan ko ', 'Barangay Clearance', '', '', '', 'Declined', '2026-02-16 23:00:16', '2026-02-16 23:00:16', ''),
 (22, 2, 'Katsu Rodriguez Perlas', 'Hulaan mo', 'For job ', 'Barangay ID', 'ewan ko', 'kahit saan', '19209348-120-370-12', 'Declined', '2026-03-02 21:07:32', '2026-03-02 21:07:32', 'Test'),
-(23, 2, 'Katsu Rodriguez Perlas', 'Hulaan mo', 'For job ', 'Barangay Clearance', '', '', '', 'Declined', '2026-03-03 21:39:52', '2026-03-03 21:39:52', 'test');
+(23, 2, 'Katsu Rodriguez Perlas', 'Hulaan mo', 'For job ', 'Barangay Clearance', '', '', '', 'Declined', '2026-03-03 21:39:52', '2026-03-03 21:39:52', 'test'),
+(24, 3, 'Marcus Dominique  Muico', 'Blk.15 Lot 1 D Matuklasan, Kung Saan-Saan na Napadpad St. Naligaw City', 'sdasdsad', 'Barangay Clearance', '', '', '', 'Approved', '2026-03-21 12:30:53', '2026-03-21 12:30:53', '');
 
 --
 -- Indexes for dumped tables
@@ -615,7 +660,7 @@ ALTER TABLE `accounts`
 -- AUTO_INCREMENT for table `admin_followups`
 --
 ALTER TABLE `admin_followups`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `announcements`
@@ -639,7 +684,7 @@ ALTER TABLE `feedbacks`
 -- AUTO_INCREMENT for table `login_logs`
 --
 ALTER TABLE `login_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=259;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=301;
 
 --
 -- AUTO_INCREMENT for table `otp_codes`
@@ -657,7 +702,7 @@ ALTER TABLE `reports`
 -- AUTO_INCREMENT for table `requests`
 --
 ALTER TABLE `requests`
-  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- Constraints for dumped tables

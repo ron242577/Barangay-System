@@ -269,7 +269,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['r
                     <th>Resident ID</th>
                     <th>Resident Name</th>
                     <th>Message</th>
-                    <th>Date</th>
+                    <th>Date Donated</th>
                 </tr>
                 <?php if (empty($rows)): ?>
                     <tr><td colspan="6">No donations found.</td></tr>
@@ -280,7 +280,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf' && in_array($_SESSION['r
                             <td>RES-<?= str_pad($d['resident_id'], 3, '0', STR_PAD_LEFT) ?></td>
                             <td><?= htmlspecialchars($d['resident_name']) ?></td>
                             <td><?= htmlspecialchars($d['message']) ?></td>
-                            <td><?= htmlspecialchars($d['created_at']) ?></td>
+                            <td><?= date('m-d-Y h:i A', strtotime($d['created_at'])) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -361,7 +361,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     header('Content-Type: text/csv');
     header('Content-Disposition: attachment; filename="donations_report.csv"');
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['Request ID', 'Resident ID', 'Resident Name', 'Status', 'Message', 'Created At']);
+    fputcsv($output, ['Request ID', 'Resident ID', 'Resident Name', 'Status', 'Message', 'Date Donated']);
     foreach ($export_donations as $donation) {
         fputcsv($output, [
             'DON-' . str_pad($donation['id'], 3, '0', STR_PAD_LEFT),
@@ -690,17 +690,19 @@ $stmt->close();
   <th>Request ID</th>
   <th>Resident Id</th>
   <th>Resident Name</th>
+  <th>Date Donated</th>
   <th>Status</th>
   <th>Actions</th>
 </tr>
 <?php if (empty($donations)): ?>
-<tr><td colspan="5">No donations found.</td></tr>
+<tr><td colspan="6">No donations found.</td></tr>
 <?php else: ?>
 <?php foreach ($donations as $donation): ?>
 <tr>
   <td>DON-<?= str_pad($donation['id'], 3, '0', STR_PAD_LEFT) ?></td>
   <td>RES-<?= str_pad($donation['resident_id'], 3, '0', STR_PAD_LEFT) ?></td>
   <td><?= htmlspecialchars($donation['resident_name']) ?></td>
+  <td><?= date('m-d-Y h:i A', strtotime($donation['created_at'])) ?></td>
   <td><?= htmlspecialchars($donation['status']) ?></td>
   <td style="text-align:center;">
     <button class="btn-view" onclick="viewDonation(<?= htmlspecialchars(json_encode($donation)) ?>)">View</button>
