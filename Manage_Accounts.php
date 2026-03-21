@@ -48,6 +48,131 @@ function formatLastLogin($datetime) {
 }
 
 /* =========================================
+   NOTIFICATIONS
+========================================= */
+// TOTAL REGISTERED ACCOUNTS
+$totalAccountsQuery = "SELECT COUNT(*) AS total FROM accounts";
+$totalAccountsResult = $conn->query($totalAccountsQuery);
+$totalAccounts = $totalAccountsResult ? $totalAccountsResult->fetch_assoc()['total'] : 0;
+
+// PENDING ACCOUNTS
+$pendingAccountsQuery = "SELECT COUNT(*) AS total FROM accounts WHERE status = 'pending' AND role = 'resident'";
+$pendingAccountsResult = $conn->query($pendingAccountsQuery);
+$pendingAccounts = $pendingAccountsResult ? $pendingAccountsResult->fetch_assoc()['total'] : 0;
+
+// PENDING REQUESTS
+$pendingRequestsQuery = "SELECT COUNT(*) AS total FROM requests WHERE status IN ('pending','Pending')";
+$pendingRequestsResult = $conn->query($pendingRequestsQuery);
+$pendingRequests = $pendingRequestsResult ? $pendingRequestsResult->fetch_assoc()['total'] : 0;
+
+// PENDING REPORTS
+$pendingReportsQuery = "SELECT COUNT(*) AS total FROM reports WHERE status IN ('pending','Pending')";
+$pendingReportsResult = $conn->query($pendingReportsQuery);
+$pendingReports = $pendingReportsResult ? $pendingReportsResult->fetch_assoc()['total'] : 0;
+
+// PENDING DONATIONS
+$pendingDonationsQuery = "SELECT COUNT(*) AS total FROM donations WHERE status = 'New'";
+$pendingDonationsResult = $conn->query($pendingDonationsQuery);
+$pendingDonations = $pendingDonationsResult ? $pendingDonationsResult->fetch_assoc()['total'] : 0;
+
+// PENDING FEEDBACKS
+$pendingFeedbacksQuery = "SELECT COUNT(*) AS total FROM feedbacks WHERE status = 'New'";
+$pendingFeedbacksResult = $conn->query($pendingFeedbacksQuery);
+$pendingFeedbacks = $pendingFeedbacksResult ? $pendingFeedbacksResult->fetch_assoc()['total'] : 0;
+
+// PENDING FOLLOW-UP MESSAGES
+$pendingFollowUpsQuery = "
+  SELECT COUNT(*) AS total
+  FROM admin_followups af
+  LEFT JOIN accounts a ON af.sender_email = a.email
+  WHERE af.status = 'New'
+    AND (a.status IS NULL OR a.status != 'active')
+";
+$pendingFollowUpsResult = $conn->query($pendingFollowUpsQuery);
+$pendingFollowUps = $pendingFollowUpsResult ? $pendingFollowUpsResult->fetch_assoc()['total'] : 0;
+
+// TOTAL PENDING NOTIFICATIONS
+$totalPending = $pendingRequests + $pendingReports + $pendingDonations + $pendingFeedbacks + $pendingAccounts + $pendingFollowUps;
+
+// RECENT NOTIFICATIONS
+$recentNotifications = [];
+
+// Recent Requests
+$recentRequestsQuery = "SELECT 'Request' AS type, r.request_id AS id, r.document_type AS details, r.created_at AS date, a.fullname AS user
+                        FROM requests r
+                        JOIN accounts a ON r.user_id = a.id
+                        WHERE r.status IN ('pending','Pending')
+                        ORDER BY r.created_at DESC LIMIT 5";
+$recentRequestsResult = $conn->query($recentRequestsQuery);
+while ($recentRequestsResult && ($row = $recentRequestsResult->fetch_assoc())) {
+    $recentNotifications[] = $row;
+}
+
+// Recent Reports
+$recentReportsQuery = "SELECT 'Report' AS type, r.id AS id, r.reason AS details, r.created_at AS date, a.fullname AS user
+                       FROM reports r
+                       JOIN accounts a ON r.user_id = a.id
+                       WHERE r.status IN ('pending','Pending')
+                       ORDER BY r.created_at DESC LIMIT 5";
+$recentReportsResult = $conn->query($recentReportsQuery);
+while ($recentReportsResult && ($row = $recentReportsResult->fetch_assoc())) {
+    $recentNotifications[] = $row;
+}
+
+// Recent Donations
+$recentDonationsQuery = "SELECT 'Donation' AS type, d.id AS id, d.message AS details, d.created_at AS date, a.fullname AS user
+                         FROM donations d
+                         JOIN accounts a ON d.user_id = a.id
+                         WHERE d.status = 'New'
+                         ORDER BY d.created_at DESC LIMIT 5";
+$recentDonationsResult = $conn->query($recentDonationsQuery);
+while ($recentDonationsResult && ($row = $recentDonationsResult->fetch_assoc())) {
+    $recentNotifications[] = $row;
+}
+
+// Recent Feedbacks
+$recentFeedbacksQuery = "SELECT 'Feedback' AS type, f.id AS id, f.feedback_text AS details, f.created_at AS date, a.fullname AS user
+                         FROM feedbacks f
+                         JOIN accounts a ON f.user_id = a.id
+                         WHERE f.status = 'New'
+                         ORDER BY f.created_at DESC LIMIT 5";
+$recentFeedbacksResult = $conn->query($recentFeedbacksQuery);
+while ($recentFeedbacksResult && ($row = $recentFeedbacksResult->fetch_assoc())) {
+    $recentNotifications[] = $row;
+}
+
+// Recent Accounts
+$recentAccountsQuery = "SELECT 'Account' AS type, a.id AS id, CONCAT('New account: ', a.fullname) AS details, a.created_at AS date, a.fullname AS user
+                        FROM accounts a
+                        WHERE a.status = 'pending' AND a.role = 'resident'
+                        ORDER BY a.created_at DESC LIMIT 5";
+$recentAccountsResult = $conn->query($recentAccountsQuery);
+while ($recentAccountsResult && ($row = $recentAccountsResult->fetch_assoc())) {
+    $recentNotifications[] = $row;
+}
+
+// Recent Follow-ups
+$recentFollowUpsQuery = "
+  SELECT 'FollowUp' AS type, af.id AS id, af.message AS details, af.created_at AS date, af.sender_email AS user
+  FROM admin_followups af
+  LEFT JOIN accounts a ON af.sender_email = a.email
+  WHERE af.status = 'New'
+    AND (a.status IS NULL OR a.status != 'active')
+  ORDER BY af.created_at DESC
+  LIMIT 5
+";
+$recentFollowUpsResult = $conn->query($recentFollowUpsQuery);
+while ($recentFollowUpsResult && ($row = $recentFollowUpsResult->fetch_assoc())) {
+    $recentNotifications[] = $row;
+}
+
+// Sort notifications
+usort($recentNotifications, function($a, $b) {
+    return strtotime($b['date']) - strtotime($a['date']);
+});
+$recentNotifications = array_slice($recentNotifications, 0, 10);
+
+/* =========================================
    ACTIVATE / DEACTIVATE ACCOUNT
 ========================================= */
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["account_id"], $_POST["toggle_status"])) {
@@ -358,6 +483,74 @@ while ($row = $result->fetch_assoc()) {
             justify-content: flex-end;
             flex-wrap: wrap;
         }
+
+        .notification-container {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: 18px;
+            background: red;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .notification-dropdown {
+            position: absolute;
+            top: 50px;
+            right: 0;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 350px;
+            max-height: 400px;
+            overflow-y: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .notification-dropdown h4 { margin: 0 0 10px 0; font-size: 16px; }
+        .notification-dropdown ul { list-style: none; padding: 0; margin: 0; }
+        .notification-dropdown li { margin-bottom: 10px; padding: 8px; border-bottom: 1px solid #eee; }
+        .notification-dropdown li:last-child { border-bottom: none; }
+        .notification-dropdown .notification-item { text-decoration: none; color: #333; display: block; }
+        .notification-dropdown .notification-item:hover { background: #f0f0f0; }
+        .notification-dropdown .notification-type { font-weight: bold; color: #007bff; }
+        .notification-dropdown .notification-details { font-size: 14px; margin: 5px 0; }
+        .notification-dropdown .notification-date { font-size: 12px; color: #666; }
+
+        .notif-info { margin-top: 10px; font-size: 14px; line-height: 1.5; }
+        .notif-info .row { margin: 8px 0; }
+        .notif-info .label { font-weight: 800; color: #333; }
+        .notif-info .value { color: #444; white-space: pre-wrap; word-break: break-word; }
+
+        .btn-row {
+            display:flex;
+            gap:10px;
+            justify-content:flex-end;
+            margin-top: 14px;
+            flex-wrap:wrap;
+        }
+
+        .btn-basic {
+            padding:10px 14px;
+            border:none;
+            border-radius:8px;
+            cursor:pointer;
+            font-weight:800;
+        }
+
+        .btn-blue {
+            background:#1a73e8;
+            color:#fff;
+        }
     </style>
 </head>
 <body>
@@ -379,12 +572,10 @@ while ($row = $result->fetch_assoc()) {
         <img class="icon" src="images/dashboard.png" alt="home" />
         <h4 class="text">Dashboard</h4>
     </div>
-
-    <div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
+<div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
         <img class="icon" src="images/add-user.png" alt="manage accounts" />
         <h4 class="text">Manage Accounts</h4>
     </div>
-
     <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
         <img class="icon" src="images/add-user.png" alt="home" />
         <h4 class="text">Pending Accounts</h4>
@@ -410,6 +601,8 @@ while ($row = $result->fetch_assoc()) {
         <h4 class="text">Feedback</h4>
     </div>
 
+    
+
     <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
 
     <div class="address1">
@@ -428,8 +621,77 @@ while ($row = $result->fetch_assoc()) {
 <div class="content">
     <div class="dashboard-header">
         <div class="header-left">
-            <img src="images/logo2.png" class="logo" alt="Logo">
-            <h1>Manage Accounts</h1>
+            <img src="images/logo2.png" class="logo">
+            <div class="header-text">
+                <h1 class="res1">Barangay Management & E-Services Platform</h1>
+            </div>
+        </div>
+
+        <div class="notification-container" onclick="toggleNotifications()">
+            <img src="images/notification.png" class="header-icon" alt="Notifications">
+            <?php if ($totalPending > 0): ?>
+                <span class="notification-badge"><?= $totalPending ?></span>
+            <?php endif; ?>
+        </div>
+    </div>
+
+<hr class="green-line">
+
+    <div id="notificationDropdown" class="notification-dropdown" style="display:none;">
+        <h4>Recent Notifications</h4>
+        <ul>
+            <?php if (empty($recentNotifications)): ?>
+                <li>No new notifications.</li>
+            <?php else: ?>
+                <?php foreach ($recentNotifications as $notif): ?>
+                    <?php
+                    $type = (string)($notif['type'] ?? '');
+                    $id = (int)($notif['id'] ?? 0);
+                    $user = (string)($notif['user'] ?? '');
+                    $details = (string)($notif['details'] ?? '');
+                    $date = (string)($notif['date'] ?? '');
+                    ?>
+                    <li>
+                        <a href="#"
+                           class="notification-item"
+                           data-type="<?= htmlspecialchars($type, ENT_QUOTES) ?>"
+                           data-id="<?= $id ?>"
+                           data-user="<?= htmlspecialchars($user, ENT_QUOTES) ?>"
+                           data-details="<?= htmlspecialchars($details, ENT_QUOTES) ?>"
+                           data-date="<?= htmlspecialchars($date, ENT_QUOTES) ?>"
+                           onclick="openNotificationModal(event, this)">
+                            <div class="notification-type"><?= htmlspecialchars($type) ?> from <?= htmlspecialchars($user) ?></div>
+                            <div class="notification-details"><?= htmlspecialchars(substr($details, 0, 50)) ?>...</div>
+                            <div class="notification-date"><?= date('M d, Y H:i', strtotime($date)) ?></div>
+                        </a>
+                    </li>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </ul>
+    </div>
+
+    <div id="notificationModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeNotificationModal()">&times;</span>
+            <div style="display: flex; align-items:flex-start; margin-left:0px;">
+                <div class="logo-containerinfo">
+                    <img class="logoa" src="images/info1.png" alt="Logo">
+                </div>
+                <h2 class="notiftitle" style=" color: #443d3d;" id="notifTitle">Notification Details</h2>
+            </div>
+            <hr style="width:99%;">
+
+            <div class="notif-info">
+                <div class="row"><span class="label">Type:</span> <span class="value" id="notifType"></span></div>
+                <div class="row"><span class="label">From:</span> <span class="value" id="notifFrom"></span></div>
+                <div class="row"><span class="label">Date:</span> <span class="value" id="notifDate"></span></div>
+                <div class="row"><span class="label">Details:</span></div>
+                <div class="row"><div class="value" id="notifDetails"></div></div>
+            </div>
+
+            <div class="btn-row">
+                <button type="button" class="btn-basic btn-blue" id="notifGoBtn">Go to Page</button>
+            </div>
         </div>
     </div>
 
@@ -439,7 +701,7 @@ while ($row = $result->fetch_assoc()) {
                 <div class="logo-containeradmin">
                     <img class="logoadmin" src="images/report.png" alt="Logo">
                 </div>
-                <h3 style="margin-top: 8px; margin-left:5px; color: #443d3d;">Accounts Table</h3>
+                <h3 style="margin-top: 8px; margin-left:5px; color: #443d3d;">Manage Accounts</h3>
             </div>
 
             <div class="flex3">
@@ -646,9 +908,63 @@ function closeStatusModal() {
     document.getElementById("statusConfirmModal").style.display = "none";
 }
 
+function toggleNotifications() {
+    const dropdown = document.getElementById('notificationDropdown');
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+}
+
+function getPageByType(type) {
+    if (type === 'Request') return 'Request.php';
+    if (type === 'Report') return 'Report.php';
+    if (type === 'Donation') return 'Donate.php';
+    if (type === 'Feedback') return 'Feedback.php';
+    if (type === 'Account') return 'Resident_User.php';
+    if (type === 'FollowUp') return 'Resident_User.php';
+    return 'SuperAdmin_Dashboard.php';
+}
+
+function openNotificationModal(e, el) {
+    e.preventDefault();
+
+    const type = el.getAttribute('data-type') || '';
+    const user = el.getAttribute('data-user') || '';
+    const details = el.getAttribute('data-details') || '';
+    const dateRaw = el.getAttribute('data-date') || '';
+
+    document.getElementById('notifType').innerText = type;
+    document.getElementById('notifFrom').innerText = user;
+
+    try {
+        const d = new Date(dateRaw.replace(' ', 'T'));
+        if (!isNaN(d.getTime())) {
+            const options = { year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' };
+            document.getElementById('notifDate').innerText = d.toLocaleString(undefined, options);
+        } else {
+            document.getElementById('notifDate').innerText = dateRaw;
+        }
+    } catch {
+        document.getElementById('notifDate').innerText = dateRaw;
+    }
+
+    document.getElementById('notifDetails').innerText = details;
+
+    const goBtn = document.getElementById('notifGoBtn');
+    goBtn.onclick = function() {
+        window.location.href = getPageByType(type);
+    };
+
+    document.getElementById('notificationDropdown').style.display = 'none';
+    document.getElementById('notificationModal').style.display = 'block';
+}
+
+function closeNotificationModal() {
+    document.getElementById('notificationModal').style.display = 'none';
+}
+
 window.onclick = function(event) {
     const roleModal = document.getElementById("roleModal");
     const statusModal = document.getElementById("statusConfirmModal");
+    const notifModal = document.getElementById("notificationModal");
 
     if (event.target === roleModal) {
         roleModal.style.display = "none";
@@ -656,6 +972,10 @@ window.onclick = function(event) {
 
     if (event.target === statusModal) {
         statusModal.style.display = "none";
+    }
+
+    if (event.target === notifModal) {
+        notifModal.style.display = "none";
     }
 }
 </script>
