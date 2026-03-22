@@ -1,5 +1,6 @@
 <?php
 session_start();
+
 if (!isset($_SESSION["role"]) || !in_array($_SESSION["role"], ["Admin", "SuperAdmin"])) {
     header("Location: login.php");
     exit;
@@ -7,23 +8,60 @@ if (!isset($_SESSION["role"]) || !in_array($_SESSION["role"], ["Admin", "SuperAd
 
 include "db.php";
 
+/*
+|--------------------------------------------------------------------------
+| PHPMailer loader
+|--------------------------------------------------------------------------
+| Try Composer autoload first.
+| If unavailable or incomplete, load PHPMailer manually.
+*/
+$phpMailerLoaded = false;
+
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+    $phpMailerLoaded = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
+}
+
+if (!$phpMailerLoaded) {
+    $phpMailerFiles = [
+        __DIR__ . '/vendor/phpmailer/phpmailer/src/Exception.php',
+        __DIR__ . '/vendor/phpmailer/phpmailer/src/PHPMailer.php',
+        __DIR__ . '/vendor/phpmailer/phpmailer/src/SMTP.php',
+    ];
+
+    $allFilesExist = true;
+    foreach ($phpMailerFiles as $file) {
+        if (!file_exists($file)) {
+            $allFilesExist = false;
+            break;
+        }
+    }
+
+    if ($allFilesExist) {
+        require_once __DIR__ . '/vendor/phpmailer/phpmailer/src/Exception.php';
+        require_once __DIR__ . '/vendor/phpmailer/phpmailer/src/PHPMailer.php';
+        require_once __DIR__ . '/vendor/phpmailer/phpmailer/src/SMTP.php';
+        $phpMailerLoaded = class_exists('PHPMailer\\PHPMailer\\PHPMailer');
+    }
+}
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 // ========================================
 // FUNCTION: Send Approval Email
 // ========================================
 function sendApprovalEmail($email, $fullname) {
+    if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        error_log("PHPMailer is not installed or not loaded.");
+        return false;
+    }
+
     try {
-        // Gmail SMTP Configuration
         $mail_user = 'pikachu242577@gmail.com';
         $mail_pass = 'zjlxukghikzifknf';
 
-        // Check if PHPMailer exists
-        if (!file_exists('vendor/autoload.php')) {
-            error_log("PHPMailer not found for approval email to: $email");
-            return false;
-        }
-
-        require 'vendor/autoload.php';
-        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+        $mail = new PHPMailer(true);
 
         // SMTP configuration
         $mail->isSMTP();
@@ -31,12 +69,8 @@ function sendApprovalEmail($email, $fullname) {
         $mail->SMTPAuth   = true;
         $mail->Username   = $mail_user;
         $mail->Password   = $mail_pass;
-        $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
-
-        // Clear previous recipients
-        $mail->clearAddresses();
-        $mail->clearReplyTos();
 
         // Sender and Recipient
         $mail->setFrom($mail_user, 'Barangay 292 E-Services');
@@ -65,7 +99,7 @@ function sendApprovalEmail($email, $fullname) {
                     </div>
                     <p>Dear " . htmlspecialchars($fullname) . ",</p>
                     <div class='message-box'>
-                        <div class='approval-text'>Your account is approve, You can now access the website.</div>
+                        <div class='approval-text'>Your account is approved. You can now access the website.</div>
                     </div>
                     <p>You can now log in to your account and start using the Barangay 292 E-Services platform.</p>
                     <p><strong>Next Steps:</strong> Visit our website and log in with your email address and password.</p>
@@ -76,11 +110,9 @@ function sendApprovalEmail($email, $fullname) {
             </body>
             </html>
         ";
-        $mail->AltBody = "Your account is approve, You can now access the website.";
+        $mail->AltBody = "Your account is approved. You can now access the website.";
 
-        // Send email
         return $mail->send();
-
     } catch (Exception $e) {
         error_log("Error sending approval email: " . $e->getMessage());
         return false;
@@ -92,7 +124,6 @@ if (isset($_POST['action']) && isset($_POST['account_id'])) {
     $account_id = (int)$_POST['account_id'];
     $action = $_POST['action'];
 
-    // ✅ get the email and fullname first (so we can send approval email)
     $email = '';
     $fullname = '';
     $getEmail = $conn->prepare("SELECT email, fullname FROM accounts WHERE id = ?");
@@ -114,12 +145,9 @@ if (isset($_POST['action']) && isset($_POST['account_id'])) {
     $stmt->execute();
     $stmt->close();
 
-    // ✅ If approved, send approval email and remove FollowUp notifications
     if ($action === 'approve' && $email !== '') {
-        // Send approval email
         sendApprovalEmail($email, $fullname);
 
-        // Remove their FollowUp notifications by marking them Read
         $upd = $conn->prepare("UPDATE admin_followups SET status = 'Read' WHERE sender_email = ? AND status = 'New'");
         $upd->bind_param("s", $email);
         $upd->execute();
@@ -140,7 +168,6 @@ $search = isset($_GET['search']) ? $_GET['search'] : '';
    ========================== */
 if (isset($_GET['export']) && $_GET['export'] === 'pdf') {
 
-    // Build SAME query logic (no LIMIT) for report
     $query = "SELECT 
                 id,
                 fullname,
@@ -194,7 +221,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf') {
     $stmt->execute();
     $res = $stmt->get_result();
 
-    // Totals for header
     $totalRequested = 0;
     $totalPWD = 0;
     $totalISF = 0;
@@ -213,7 +239,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf') {
     }
     $stmt->close();
 
-    // return to same page with same filters (remove export)
     $qs = $_GET;
     unset($qs['export']);
     $returnUrl = 'Resident_User.php' . (!empty($qs) ? ('?' . http_build_query($qs)) : '');
@@ -327,7 +352,7 @@ $totalAccountsQuery = "SELECT COUNT(*) AS total FROM accounts";
 $totalAccountsResult = $conn->query($totalAccountsQuery);
 $totalAccounts = $totalAccountsResult ? $totalAccountsResult->fetch_assoc()['total'] : 0;
 
-// PENDING ACCOUNTS (resident only)
+// PENDING ACCOUNTS
 $pendingAccountsQuery = "SELECT COUNT(*) AS total FROM accounts WHERE status = 'pending' AND role = 'resident'";
 $pendingAccountsResult = $conn->query($pendingAccountsQuery);
 $pendingAccounts = $pendingAccountsResult ? $pendingAccountsResult->fetch_assoc()['total'] : 0;
@@ -352,7 +377,7 @@ $pendingFeedbacksQuery = "SELECT COUNT(*) AS total FROM feedbacks WHERE status =
 $pendingFeedbacksResult = $conn->query($pendingFeedbacksQuery);
 $pendingFeedbacks = $pendingFeedbacksResult ? $pendingFeedbacksResult->fetch_assoc()['total'] : 0;
 
-// ✅ PENDING FOLLOW-UPS (same as Admin Dashboard)
+// PENDING FOLLOW-UPS
 $pendingFollowUpsQuery = "
   SELECT COUNT(*) AS total
   FROM admin_followups af
@@ -366,7 +391,7 @@ $pendingFollowUps = $pendingFollowUpsResult ? $pendingFollowUpsResult->fetch_ass
 // TOTAL PENDING NOTIFICATIONS
 $totalPending = $pendingRequests + $pendingReports + $pendingDonations + $pendingFeedbacks + $pendingAccounts + $pendingFollowUps;
 
-// RECENT NOTIFICATIONS (last 10 items across all types)
+// RECENT NOTIFICATIONS
 $recentNotifications = [];
 
 // Recent Requests
@@ -413,7 +438,7 @@ while ($recentFeedbacksResult && ($row = $recentFeedbacksResult->fetch_assoc()))
     $recentNotifications[] = $row;
 }
 
-// Recent Accounts (pending resident)
+// Recent Accounts
 $recentAccountsQuery = "SELECT 'Account' AS type, a.id AS id, CONCAT('New account: ', a.fullname) AS details, a.created_at AS date, a.fullname AS user
                         FROM accounts a
                         WHERE a.status = 'pending' AND a.role = 'resident'
@@ -423,7 +448,7 @@ while ($recentAccountsResult && ($row = $recentAccountsResult->fetch_assoc())) {
     $recentNotifications[] = $row;
 }
 
-// ✅ Recent Follow-ups (same as Admin Dashboard)
+// Recent Follow-ups
 $recentFollowUpsQuery = "
   SELECT 'FollowUp' AS type, af.id AS id, af.message AS details, af.created_at AS date, af.sender_email AS user
   FROM admin_followups af
@@ -438,7 +463,7 @@ while ($recentFollowUpsResult && ($row = $recentFollowUpsResult->fetch_assoc()))
     $recentNotifications[] = $row;
 }
 
-// Sort all notifications by date descending
+// Sort notifications
 usort($recentNotifications, function($a, $b) {
     return strtotime($b['date']) - strtotime($a['date']);
 });
@@ -454,7 +479,6 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
 <title>Resident Accounts</title>
 
 <style>
-/* Modal Styles */
 .modal {
     display: none;
     position: fixed;
@@ -489,7 +513,6 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
 .modal-info p { margin: 10px 0; line-height: 1.5; }
 .modal-info strong { display: inline-block; width: 150px; }
 
-/* Inline styles for notification badge and dropdown */
 .notification-container { position: relative; display: inline-block; cursor: pointer; }
 .notification-badge {
     position: absolute;
@@ -525,13 +548,11 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
 .notification-dropdown .notification-details { font-size: 14px; margin: 5px 0; }
 .notification-dropdown .notification-date { font-size: 12px; color: #666; }
 
-/* Notification details UI */
 .notif-info { margin-top: 10px; font-size: 14px; line-height: 1.5; }
 .notif-info .row { margin: 8px 0; }
 .notif-info .label { font-weight: 800; color: #333; }
 .notif-info .value { color: #444; white-space: pre-wrap; word-break: break-word; }
 
-/* Buttons */
 .btn-row { display:flex; gap:10px; justify-content:flex-end; margin-top: 14px; flex-wrap:wrap; }
 .btn-basic { padding:10px 14px; border:none; border-radius:8px; cursor:pointer; font-weight:800; }
 .btn-gray { background:#eee; color:#333; }
@@ -550,7 +571,6 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
    </div>
        <div class="info">
    <h4 class="username"><?= htmlspecialchars($_SESSION["fullname"]) ?></h4> 
-
         <h4 class="usertype"><?= htmlspecialchars($_SESSION["role"]) ?></h4>
    </div>
 </div>
@@ -568,12 +588,14 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
     <h4 class="text">Dashboard</h4>
   </div>
 <?php endif; ?>
+
 <?php if ($_SESSION["role"] === "SuperAdmin"): ?>
 <div class="btncontainer" onclick="window.location.href='Manage_Accounts.php'">
     <img class="icon" src="images/add-user.png" alt="manage accounts" />
     <h4 class="text">Manage Accounts</h4>
 </div>
 <?php endif; ?>
+
    <div class="btncontainer" onclick="window.location.href='Resident_User.php'">
      <img class="icon" src="images/add-user.png" alt="home" /> 
      <h4 class="text">Pending Accounts</h4>
@@ -599,21 +621,19 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
      <h4 class="text">Feedback</h4>
    </div>
    
-     <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
+   <hr style="width: 100%; border: 0.5px solid rgba(255, 255, 255, 0.4); margin-top: 0px;">
      
-<div class="address1" >
-             <img class="logoadd" src="images/pin.png" alt="Feedback">
-             <div class="addtext">
-              <p class=> Zone 28 Disctrict 3 <br>808 Reigna Regente St. <br>Binondo, Manila</p>
-          </div>
-          </div>
+   <div class="address1">
+      <img class="logoadd" src="images/pin.png" alt="Feedback">
+      <div class="addtext">
+        <p>Zone 28 Disctrict 3 <br>808 Reigna Regente St. <br>Binondo, Manila</p>
+      </div>
+   </div>
 
    <div class="logoutcontainer" onclick="window.location.href='logout.php'">
-             <img class="logolog" src="images/logout.png" alt="Feedback">
-            <h4 class="logout">Logout</h4>
-        </div>
-
-  
+      <img class="logolog" src="images/logout.png" alt="Feedback">
+      <h4 class="logout">Logout</h4>
+   </div>
 </div>
 
 <div class="content">
@@ -633,7 +653,6 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
   </div>
 </div>
 
-<!-- Notification Dropdown -->
 <div id="notificationDropdown" class="notification-dropdown" style="display:none;">
   <h4>Recent Notifications</h4>
   <ul>
@@ -674,27 +693,20 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
 
 <hr class="green-line">
 
-<!-- ACCOUNTS -->
 <div id="cardaccounts" class="cardaccounts">
   <div class="flex1" style="align-items:center; gap: 10px; margin-bottom:10px; flex-wrap:wrap;">
     <div style="display:flex; align-items:flex-start; margin-top: 8px;">
        <div class="logo-containeradmin">
-    <img class="logoadmin" src="images/pendingaccs.png" alt="Logo">
-</div>
-  <h3 style="margin-top: 10px; margin-left:5px;  color: #443d3d; margin-bottom:0px;">Pending Accounts</h3>
-</div>
+         <img class="logoadmin" src="images/pendingaccs.png" alt="Logo">
+       </div>
+       <h3 style="margin-top: 10px; margin-left:5px; color: #443d3d; margin-bottom:0px;">Pending Accounts</h3>
+    </div>
 
     <div class="flex3">
-      <form class="resform"method="GET" action="Resident_User.php" id="filterForm" >
-        
-     
-
-       
-      </form>
+      <form class="resform" method="GET" action="Resident_User.php" id="filterForm"></form>
     </div>
   </div>
 
-  <!-- ACCOUNTS TABLE -->
   <div class="table-container">
     <table>
       <tr>
@@ -776,9 +788,9 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
               echo "<td>{$row['phone']}</td>";
               echo "<td>{$row['email']}</td>";
               echo "<td>
-                  <button class='btn-view' onclick='viewAccount(" . htmlspecialchars(json_encode($row)) . ")'>View</button>
-                  <button type='button' class='btn-approve' onclick='openApproveModal(" . $row['id'] . ", " . htmlspecialchars(json_encode($row['fullname'])) . ")'>Approve</button>
-                  <button type='button' class='btn-decline' onclick='openDeclineModal(" . $row['id'] . ", " . htmlspecialchars(json_encode($row['fullname'])) . ")'>Decline</button>
+                  <button class='btn-view' onclick='viewAccount(" . htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8') . ")'>View</button>
+                  <button type='button' class='btn-approve' onclick='openApproveModal(" . (int)$row['id'] . ", " . htmlspecialchars(json_encode($row['fullname']), ENT_QUOTES, 'UTF-8') . ")'>Approve</button>
+                  <button type='button' class='btn-decline' onclick='openDeclineModal(" . (int)$row['id'] . ", " . htmlspecialchars(json_encode($row['fullname']), ENT_QUOTES, 'UTF-8') . ")'>Decline</button>
                 </td>";
               echo "</tr>";
           }
@@ -789,31 +801,27 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
     </table>
   </div>
 
-  <!-- Modal for viewing resident details -->
   <div id="viewModal" class="modal">
       <div class="modal-content">
           <span class="close" onclick="closeModal()">&times;</span>
-             <div style="display:flex; align-items:flex-start;">
-     
-
-  <h2 style="margin-top: 3px; margin-left:0px; margin-bottom:10px; color: gree;">User Details</h2>
-</div>
-<hr style="width:100%;">
+          <div style="display:flex; align-items:flex-start;">
+              <h2 style="margin-top: 3px; margin-left:0px; margin-bottom:10px;">User Details</h2>
+          </div>
+          <hr style="width:100%;">
           <div class="modal-info" id="modalInfo"></div>
       </div>
   </div>
 
-  <!-- ✅ Notification Details Modal (same behavior as Admin Dashboard) -->
   <div id="notificationModal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closeNotificationModal()">&times;</span>
-       <div style="display: flex; align-items:flex-start; margin-left:0px;">
+      <div style="display: flex; align-items:flex-start; margin-left:0px;">
          <div class="logo-containerinfo">
-    <img class="logoa" src="images/info1.png" alt="Logo">
-</div>
-          <h2 class="notiftitle" style=" color: #443d3d;" id="notifTitle">Notification Details</h2>
-    </div>
-        <hr style="width:99%;">
+            <img class="logoa" src="images/info1.png" alt="Logo">
+         </div>
+         <h2 class="notiftitle" style=" color: #443d3d;" id="notifTitle">Notification Details</h2>
+      </div>
+      <hr style="width:99%;">
 
       <div class="notif-info">
         <div class="row"><span class="label">Type:</span> <span class="value" id="notifType"></span></div>
@@ -824,13 +832,11 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
       </div>
 
       <div class="btn-row">
-       
         <button type="button" class="btn-basic btn-blue" id="notifGoBtn">Go to Page</button>
       </div>
     </div>
   </div>
 
-  <!-- ✅ Approve Modal with Role Selection -->
   <div id="approveModal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closeApproveModal()">&times;</span>
@@ -848,14 +854,6 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
     </div>
   </div>
 
-      <div class="btn-row">
-        <button type="button" class="btn-basic btn-gray" onclick="closeApproveModal()">Cancel</button>
-        <button type="button" class="btn-basic btn-blue" onclick="submitApprove()">Approve</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ✅ Decline Modal with Confirmation -->
   <div id="declineModal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closeDeclineModal()">&times;</span>
@@ -874,11 +872,8 @@ $recentNotifications = array_slice($recentNotifications, 0, 10);
   </div>
 
   <div style="display: flex;">
-    <div class="botbtn">
-    
-    </div>
+    <div class="botbtn"></div>
   </div>
-
 </div>
 
 <script>
@@ -895,7 +890,7 @@ function getPageByType(type) {
   if (type === 'Donation') return 'Donate.php';
   if (type === 'Feedback') return 'Feedback.php';
   if (type === 'Account') return 'Resident_User.php';
-  if (type === 'FollowUp') return 'Resident_User.php'; 
+  if (type === 'FollowUp') return 'Resident_User.php';
   return 'Resident_User.php';
 }
 
@@ -925,7 +920,6 @@ function closeNotificationModal() {
   document.getElementById('notificationModal').style.display = 'none';
 }
 
-/* Report button -> printable report */
 document.addEventListener("click", function(e){
   const btn = e.target.closest(".btn-report");
   if(!btn) return;
@@ -945,7 +939,7 @@ function viewAccount(data) {
     else if (data.solo_parent == 1) category = "Solo Parent";
 
     const info = `
-        <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;" ><strong>Resident ID:</strong> RES-${String(data.id).padStart(3, '0')}</p>
+        <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Resident ID:</strong> RES-${String(data.id).padStart(3, '0')}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Full Name:</strong> ${data.fullname}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Birthdate:</strong> ${data.birthdate || 'N/A'}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Gender:</strong> ${data.gender || 'N/A'}</p>
@@ -953,13 +947,13 @@ function viewAccount(data) {
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Address:</strong> ${data.address}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Phone:</strong> ${data.phone}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Email:</strong> ${data.email}</p>
-        <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;" ><strong>Category:</strong> ${category}</p>
+        <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Category:</strong> ${category}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Household Head:</strong> ${data.household_head || 'N/A'}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>PWD:</strong> ${data.pwd == 1 ? 'Yes' : 'No'}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>ISF:</strong> ${data.isf == 1 ? 'Yes' : 'No'}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Solo Parent:</strong> ${data.solo_parent == 1 ? 'Yes' : 'No'}</p>
         <p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Status:</strong> ${data.status}</p>
-        ${data.pwd_proof ? `<p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;" ><strong>PWD Proof:</strong> <a href="${data.pwd_proof}" target="_blank">View Proof</a></p>` : ''}
+        ${data.pwd_proof ? `<p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>PWD Proof:</strong> <a href="${data.pwd_proof}" target="_blank">View Proof</a></p>` : ''}
         ${data.solo_parent_proof ? `<p style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 0px;"><strong>Solo Parent Proof:</strong> <a href="${data.solo_parent_proof}" target="_blank">View Proof</a></p>` : ''}
         ${data.proof_of_residency ? `<p><strong>Proof of Residency:</strong> <a href="${data.proof_of_residency}" target="_blank">View Proof</a></p>` : ''}
     `;
@@ -972,7 +966,6 @@ function closeModal() {
     document.getElementById('viewModal').style.display = 'none';
 }
 
-// ✅ Approve Modal Functions
 let currentApproveAccountId = null;
 
 function openApproveModal(accountId, accountName) {
@@ -987,37 +980,27 @@ function closeApproveModal() {
 }
 
 function submitApprove() {
-    const selectedRole = document.querySelector('input[name="approveRole"]:checked').value;
-    
-    // Create a form and submit it
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = 'Resident_User.php';
-    
+
     const accountIdInput = document.createElement('input');
     accountIdInput.type = 'hidden';
     accountIdInput.name = 'account_id';
     accountIdInput.value = currentApproveAccountId;
-    
+
     const actionInput = document.createElement('input');
     actionInput.type = 'hidden';
     actionInput.name = 'action';
     actionInput.value = 'approve';
-    
-    const roleInput = document.createElement('input');
-    roleInput.type = 'hidden';
-    roleInput.name = 'selected_role';
-    roleInput.value = selectedRole;
-    
+
     form.appendChild(accountIdInput);
     form.appendChild(actionInput);
-    form.appendChild(roleInput);
-    
+
     document.body.appendChild(form);
     form.submit();
 }
 
-// ✅ Decline Modal Functions
 let currentDeclineAccountId = null;
 
 function openDeclineModal(accountId, accountName) {
@@ -1032,34 +1015,33 @@ function closeDeclineModal() {
 }
 
 function submitDecline() {
-    // Create a form and submit it
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = 'Resident_User.php';
-    
+
     const accountIdInput = document.createElement('input');
     accountIdInput.type = 'hidden';
     accountIdInput.name = 'account_id';
     accountIdInput.value = currentDeclineAccountId;
-    
+
     const actionInput = document.createElement('input');
     actionInput.type = 'hidden';
     actionInput.name = 'action';
     actionInput.value = 'decline';
-    
+
     form.appendChild(accountIdInput);
     form.appendChild(actionInput);
-    
+
     document.body.appendChild(form);
     form.submit();
 }
 
-// Close modals when clicking outside
 window.onclick = function(event) {
     const viewModal = document.getElementById('viewModal');
     const notifModal = document.getElementById('notificationModal');
     const approveModal = document.getElementById('approveModal');
     const declineModal = document.getElementById('declineModal');
+
     if (event.target == viewModal) viewModal.style.display = 'none';
     if (event.target == notifModal) notifModal.style.display = 'none';
     if (event.target == approveModal) approveModal.style.display = 'none';
